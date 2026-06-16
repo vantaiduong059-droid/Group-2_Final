@@ -1,35 +1,51 @@
 <?php ob_start(); ?>
 
-<div class="d-flex justify-content-between align-items-end mb-4">
-    <div>
-        <h2 class="fw-bold mb-1" style="color: var(--text-main);">Hệ thống Cảnh báo</h2>
-        <div class="text-muted small">Cảnh báo vắng học và vi phạm</div>
-    </div>
-</div>
+<style>
+    .status-badge {
+        font-size: 0.78rem;
+        font-weight: 600;
+        padding: 5px 12px;
+        border-radius: 20px;
+    }
+    .status-pending { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+    .status-resolved { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
 
-<div class="card-modern">
-    <div class="table-responsive">
-        <table class="table-modern">
-            <thead>
-                    <tr>
-                        <th class="ps-4 py-3">STT</th>
-                        <th class="py-3">Nội dung cảnh báo</th>
-                        <th class="py-3">Tài khoản</th>
-                        <th class="py-3">Khóa học</th>
-                        <th class="py-3">Thời gian</th>
-                        <th class="py-3 text-end pe-4">Thao tác</th>
-                    </tr>
-                </thead>
-                <tbody id="alertTableBody">
-                    <tr><td colspan="6" class="text-center py-4">Đang tải dữ liệu...</td></tr>
-                </tbody>
-            </table>
-        </table>
-    </div>
-</div>
-
-<?php 
-$extraJs = '<script src="' . BASE_URL . '/assets/js/alerts.js?v=' . time() . '"></script>';
-$content = ob_get_clean();
-require_once '../app/Views/layouts/admin_layout.php'; 
-?>
+    .nav-tabs-modern {
+        border-bottom: 2px solid var(--border-color-darker);
+        gap: 8px;
+    }
+    .nav-tabs-modern .nav-link {
+        border: none;
+        color: var(--text-muted);
+        font-weight: 600;
+        padding: 10px 20px;
+        border-radius: 8px 8px 0 0;
+        position: relative;
+        transition: all 0.2s ease;
+        background: transparent;
+    }
+    .nav-tabs-modern .nav-link:hover {
+        color: var(--primary);
+        background: rgba(37, 99, 235, 0.04);
+    }
+    .nav-tabs-modern .nav-link.active {
+        color: var(--primary);
+        background: transparent;
+    }
+    .nav-tabs-modern .nav-link.active::after {
+        content: '';
+        position: absolute;
+        bottom: -2px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background-color: var(--primary);
+        border-radius: 2px;
+    }
+    .config-label {
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: var(--text-main);
+        margin-bottom: 6px;
+    }
+</style>
