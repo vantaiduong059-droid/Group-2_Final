@@ -1,6 +1,6 @@
 <?php ob_start(); ?>
 
-<!-- Styles cho giao diện Học sinh -->
+<!-- Styles cho giao diện Sinh viên -->
 <style>
     .student-card {
         border: 1px solid #cbd5e1;
@@ -127,7 +127,7 @@
 <!-- Tiêu đề & Công cụ -->
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
     <div>
-        <h2 class="fw-bold mb-1" style="color: var(--text-main); font-size: 1.6rem; letter-spacing: -0.5px;">Quản lý Học sinh</h2>
+        <h2 class="fw-bold mb-1" style="color: var(--text-main); font-size: 1.6rem; letter-spacing: -0.5px;">Quản lý Sinh viên</h2>
         <div class="text-muted small">Danh sách sinh viên, quản lý tài khoản và thông tin liên hệ</div>
     </div>
     
@@ -143,16 +143,50 @@
         </div>
         
         <button class="btn btn-primary-modern btn-sm px-3 fw-bold d-flex align-items-center gap-1" onclick="openStudentModal()" style="height: 31px; border-radius: 6px; font-size: 0.85rem; padding: 4px 12px; background: #0284c7; border: 1px solid #0284c7;">
-            <i class="bi bi-person-plus" style="font-size: 0.9rem;"></i> Thêm học sinh
+            <i class="bi bi-person-plus" style="font-size: 0.9rem;"></i> Thêm sinh viên
         </button>
     </div>
 </div>
 
-<!-- Container động chứa danh sách học sinh -->
+<!-- Hàng bộ lọc filter theo Khóa và Ngành học -->
+<div class="card border-0 shadow-sm mb-4 p-3 bg-white" style="border-radius: 12px;">
+    <div class="row g-3 align-items-center">
+        <div class="col-md-3">
+            <label class="form-label fw-semibold text-secondary small mb-1">Tìm kiếm sinh viên</label>
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                <input type="text" id="searchName" class="form-control bg-light border-start-0" placeholder="Tên hoặc tài khoản..." oninput="filterStudents()">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-semibold text-secondary small mb-1">Lọc theo Khóa</label>
+            <select id="filterCohort" class="form-select form-select-sm bg-light" onchange="filterStudents()">
+                <option value="">-- Tất cả các Khóa --</option>
+                <option value="K65">K65</option>
+                <option value="K66">K66</option>
+                <option value="K67">K67</option>
+                <option value="K68">K68</option>
+            </select>
+        </div>
+        <div class="col-md-6 d-flex gap-2 align-items-end">
+            <div class="flex-grow-1">
+                <label class="form-label fw-semibold text-secondary small mb-1">Lọc theo Ngành học</label>
+                <select id="filterMajor" class="form-select form-select-sm bg-light" onchange="filterStudents()">
+                    <option value="">-- Tất cả các Ngành --</option>
+                </select>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm fw-semibold d-flex align-items-center justify-content-center" onclick="resetFilters()" style="height: 31px; width: 31px;" title="Reset bộ lọc">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Container động chứa danh sách sinh viên -->
 <div id="studentContainer">
     <div class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
-        <div class="text-muted mt-2">Đang tải dữ liệu học sinh...</div>
+        <div class="text-muted mt-2">Đang tải dữ liệu sinh viên...</div>
     </div>
 </div>
 
@@ -167,9 +201,15 @@
             <div class="modal-body">
                 <form id="studentForm">
                     <input type="hidden" id="studentId">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary small">Họ và Tên</label>
-                        <input type="text" class="form-control" id="studentName" placeholder="Ví dụ: Trần Thị Sinh Viên 1" required>
+                    <div class="row">
+                        <div class="col-8 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Họ và tên đệm</label>
+                            <input type="text" class="form-control" id="studentLastName" placeholder="Ví dụ: Trần Thị" required>
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Tên</label>
+                            <input type="text" class="form-control" id="studentFirstName" placeholder="Sinh Viên 1" required>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">Tên đăng nhập (Username)</label>
@@ -179,9 +219,27 @@
                         <label class="form-label fw-semibold text-secondary small">Email liên lạc</label>
                         <input type="email" class="form-control" id="studentEmail" placeholder="Ví dụ: student1@example.com" required>
                     </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Khóa đào tạo</label>
+                            <select class="form-select" id="studentCohort" required>
+                                <option value="">-- Chọn khóa --</option>
+                                <option value="K65">K65</option>
+                                <option value="K66">K66</option>
+                                <option value="K67">K67</option>
+                                <option value="K68">K68</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Ngành học</label>
+                            <select class="form-select" id="studentMajor" required>
+                                <option value="">-- Chọn ngành --</option>
+                            </select>
+                        </div>
+                    </div>
                     <div class="alert alert-info py-2.5 mb-0 border-0 text-primary small d-flex align-items-center" style="background-color: #eff6ff;">
                         <i class="bi bi-info-circle-fill fs-5 me-2.5 opacity-80"></i>
-                        <span>Mật khẩu mặc định khi tạo tài khoản học sinh mới là: <b>123456</b></span>
+                        <span>Mật khẩu mặc định khi tạo tài khoản sinh viên mới là: <b>123456</b></span>
                     </div>
                 </form>
             </div>
