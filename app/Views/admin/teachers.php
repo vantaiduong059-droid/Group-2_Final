@@ -170,7 +170,7 @@
 <!-- Tiêu đề & Công cụ -->
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
     <div>
-        <h2 class="fw-bold mb-1" style="color: var(--text-main); font-size: 1.6rem; letter-spacing: -0.5px;">Quản lý Giáo viên</h2>
+        <h2 class="fw-bold mb-1" style="color: var(--text-main); font-size: 1.6rem; letter-spacing: -0.5px;">Quản lý Giảng viên</h2>
         <div class="text-muted small">Danh sách giảng viên phụ trách giảng dạy các lớp học phần</div>
     </div>
     
@@ -186,7 +186,7 @@
         </div>
         
         <button class="btn btn-primary-modern btn-sm px-3 fw-bold d-flex align-items-center gap-1" onclick="openTeacherModal()" style="height: 31px; border-radius: 6px; font-size: 0.85rem; padding: 4px 12px; background: #0284c7; border: 1px solid #0284c7;">
-            <i class="bi bi-person-plus" style="font-size: 0.9rem;"></i> Thêm giáo viên
+            <i class="bi bi-person-plus" style="font-size: 0.9rem;"></i> Thêm giảng viên
         </button>
     </div>
 </div>
@@ -210,9 +210,15 @@
             <div class="modal-body">
                 <form id="teacherForm">
                     <input type="hidden" id="teacherId">
-                    <div class="mb-3">
-                        <label class="form-label fw-semibold text-secondary small">Họ và Tên</label>
-                        <input type="text" class="form-control" id="teacherName" placeholder="Ví dụ: Nguyễn Văn Giao Viên" required>
+                    <div class="row">
+                        <div class="col-8 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Họ và tên đệm</label>
+                            <input type="text" class="form-control" id="teacherLastName" placeholder="Ví dụ: Nguyễn Văn" required>
+                        </div>
+                        <div class="col-4 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Tên</label>
+                            <input type="text" class="form-control" id="teacherFirstName" placeholder="Giảng Viên" required>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">Tên đăng nhập (Username)</label>
