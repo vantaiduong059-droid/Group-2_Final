@@ -210,32 +210,36 @@
                 <form id="courseForm">
                     <input type="hidden" id="courseId">
                     <div class="row">
-                        <div class="col-md-4 mb-3">
+                        <div class="col-8 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Tên lớp học phần</label>
+                            <input type="text" class="form-control" id="courseName" placeholder="Ví dụ: Phát triển ứng dụng Web" required>
+                        </div>
+                        <div class="col-4 mb-3">
                             <label class="form-label fw-semibold text-secondary small">Mã môn học</label>
                             <input type="text" class="form-control" id="courseCode" placeholder="VD: INS3064" required>
                         </div>
+                    </div>
+                    <div class="row">
                         <div class="col-md-4 mb-3">
                             <label class="form-label fw-semibold text-secondary small">Mã Lớp học phần</label>
                             <input type="text" class="form-control" id="classCode" placeholder="VD: INS306401" required>
                         </div>
-                        <div class="col-md-4 mb-3">
-                            <label class="form-label fw-semibold text-secondary small">Số tín chỉ</label>
-                            <input type="number" class="form-control" id="courseCredits" min="1" max="4" value="3" oninput="calcPeriods()" required>
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Tín chỉ</label>
+                            <input type="number" class="form-control" id="courseCredits" min="1" max="4" value="3" oninput="updateCreditsAndSessions()" required>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-8 mb-3">
-                            <label class="form-label fw-semibold text-secondary small">Tên lớp học phần</label>
-                            <input type="text" class="form-control" id="courseName" placeholder="Ví dụ: Phát triển ứng dụng Web" required>
-                        </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3 mb-3">
                             <label class="form-label fw-semibold text-secondary small">Số tiết (Tự tính)</label>
                             <input type="number" class="form-control bg-light fw-bold text-primary" id="coursePeriods" readonly>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label fw-semibold text-secondary small">Số buổi học</label>
+                            <input type="number" class="form-control fw-bold text-dark" id="totalSessions" min="1" max="50" value="15" required>
                         </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">Mô tả học phần</label>
-                        <textarea class="form-control" id="courseDesc" rows="3" placeholder="Tóm tắt nội dung chính học phần..."></textarea>
+                        <textarea class="form-control" id="courseDesc" rows="2" placeholder="Tóm tắt nội dung chính học phần..."></textarea>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold text-secondary small">Giảng viên phụ trách</label>
@@ -243,6 +247,24 @@
                             <option value="">-- Chọn giảng viên --</option>
                             <!-- Options load via JS -->
                         </select>
+                    </div>
+                    <!-- Phần thêm lịch học cố định hàng tuần động -->
+                    <div class="border-top pt-3 mt-3">
+                        <h6 class="fw-bold mb-3 text-dark d-flex align-items-center justify-content-between">
+                            <span><i class="bi bi-calendar-week text-primary me-2"></i>Lịch học cố định hàng tuần</span>
+                            <button type="button" class="btn btn-outline-primary btn-sm px-2.5 py-1 fw-bold" onclick="addScheduleRow()" style="font-size: 0.8rem; border-radius: 6px;">
+                                <i class="bi bi-plus-lg"></i> Thêm ca học
+                            </button>
+                        </h6>
+                        
+                        <div id="scheduleRowsContainer" class="d-flex flex-column gap-2 mb-3">
+                            <!-- Các dòng lịch học sẽ do JS sinh -->
+                        </div>
+                        
+                        <div class="alert alert-warning py-2 mb-0 border-0 text-warning small d-flex align-items-start" style="background-color: #fffbeb; border-radius: 8px;">
+                            <i class="bi bi-exclamation-triangle-fill fs-5 me-2.5 opacity-80 mt-0.5"></i>
+                            <span><b>Lưu ý chống trùng lịch:</b> Hệ thống sẽ tự động check trùng phòng, thứ và giờ học. Nếu lớp học phần đã phát sinh điểm danh, việc sửa lịch học cố định sẽ chỉ cập nhật lịch cố định nhưng không tự động sinh lại các buổi học (class_sessions) nhằm bảo toàn dữ liệu điểm danh.</span>
+                        </div>
                     </div>
                 </form>
             </div>
