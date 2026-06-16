@@ -1,13 +1,21 @@
 <?php ob_start(); ?>
 
+<style>
+    .upcoming-event-item:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+        filter: brightness(0.95);
+    }
+    body.dark-mode .upcoming-event-item:hover {
+        filter: brightness(1.1);
+    }
+</style>
+
 <div class="d-flex justify-content-between align-items-end mb-4">
     <div>
-        <h2 class="fw-bold mb-1" style="color: var(--text-main);">Tổng quan</h2>
+        <h2 class="fw-bold mb-1" style="color: var(--text-main);">Trang chủ</h2>
         <div class="text-muted">Chào mừng bạn trở lại, <span class="fw-medium text-dark"><?= isset($_SESSION['user']['full_name']) ? $_SESSION['user']['full_name'] : 'Admin' ?></span>! 👋</div>
     </div>
-    <button class="btn btn-primary-modern d-flex align-items-center gap-2">
-        <i class="bi bi-plus-lg"></i> Thêm mới
-    </button>
 </div>
 
 <!-- TOP WIDGETS -->
@@ -55,7 +63,7 @@
             </div>
             <div class="stat-info flex-grow-1">
                 <div class="title">Tỷ lệ chuyên cần</div>
-                <div class="value"><?= $attendanceRate ?>%</div>
+                <div class="value"><?= $attendanceRate !== null ? $attendanceRate . '%' : '--' ?></div>
                 <div class="trend text-muted"><i class="bi bi-dash"></i> Trung bình toàn hệ thống</div>
             </div>
         </div>
