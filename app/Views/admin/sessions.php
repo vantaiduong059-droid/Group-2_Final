@@ -1,5 +1,9 @@
 <?php ob_start(); ?>
 
+<!-- Flatpickr CSS & JS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+
 <!-- Styles cho giao diện Lịch học tuần -->
 <style>
     :root {
@@ -11,6 +15,102 @@
         --card-exam-bg: #fef9c3; /* Vàng nhẹ */
         --card-exam-border: #fef08a;
         --card-exam-text: #713f12;
+    }
+
+    /* Tùy biến Flatpickr cho hiện đại và sang trọng */
+    .flatpickr-calendar {
+        border-radius: 12px !important;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.08) !important;
+        border: 1px solid #e2e8f0 !important;
+        font-family: 'Inter', sans-serif !important;
+        background: #ffffff !important;
+        z-index: 9999 !important; /* Đảm bảo nổi lên trên modal */
+    }
+
+    .flatpickr-wrapper {
+        display: block !important;
+        width: 100% !important;
+    }
+
+    #sessionStartTime, 
+    #sessionEndTime {
+        border-radius: var(--radius-sm) !important;
+        border: 1px solid var(--border-color-darker) !important;
+        padding: 0.6rem 1rem !important;
+        height: auto !important;
+        background-color: #ffffff !important;
+        display: block !important;
+        width: 100% !important;
+    }
+
+    .flatpickr-calendar.hasTime.noCalendar {
+        width: 160px !important;
+        padding: 5px 0 !important;
+    }
+
+    .flatpickr-time {
+        height: 60px !important;
+        line-height: 60px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    .flatpickr-time input {
+        font-size: 1.4rem !important;
+        font-weight: 700 !important;
+        color: #0f172a !important;
+        border-radius: 6px !important;
+        transition: background 0.15s ease !important;
+    }
+
+    .flatpickr-time input:hover, 
+    .flatpickr-time input:focus {
+        background: #f1f5f9 !important;
+    }
+
+    .flatpickr-time .flatpickr-time-separator {
+        font-size: 1.4rem !important;
+        font-weight: 700 !important;
+        color: #64748b !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 15px !important;
+    }
+
+    .flatpickr-time .numInputWrapper {
+        height: 50px !important;
+        display: flex !important;
+        align-items: center !important;
+    }
+
+    .flatpickr-time .numInputWrapper span {
+        border: none !important;
+        background: transparent !important;
+        width: 16px !important;
+        height: 18px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        opacity: 0.6;
+        transition: all 0.15s ease !important;
+    }
+
+    .flatpickr-time .numInputWrapper span:hover {
+        background: #f1f5f9 !important;
+        opacity: 1;
+        border-radius: 4px;
+    }
+
+    .flatpickr-time .numInputWrapper span.arrowUp:after {
+        border-bottom-color: #0284c7 !important;
+        border-width: 0 4px 5px 4px !important;
+    }
+
+    .flatpickr-time .numInputWrapper span.arrowDown:after {
+        border-top-color: #0284c7 !important;
+        border-width: 5px 4px 0 4px !important;
     }
 
     .schedule-header-controls {
@@ -465,13 +565,13 @@
                     </div>
                     
                     <div class="row">
-                        <div class="col-md-6 mb-3">
+                        <div class="col-6 mb-3">
                             <label class="form-label fw-semibold text-secondary small">Giờ bắt đầu</label>
-                            <input type="time" class="form-control" id="sessionStartTime" required>
+                            <input type="text" class="form-control bg-white" id="sessionStartTime" placeholder="Chọn giờ bắt đầu" required>
                         </div>
-                        <div class="col-md-6 mb-3">
+                        <div class="col-6 mb-3">
                             <label class="form-label fw-semibold text-secondary small">Giờ kết thúc</label>
-                            <input type="time" class="form-control" id="sessionEndTime" required>
+                            <input type="text" class="form-control bg-white" id="sessionEndTime" placeholder="Chọn giờ kết thúc" required>
                         </div>
                     </div>
                     
@@ -493,6 +593,7 @@
                             <option value="completed">Đã hoàn thành</option>
                         </select>
                     </div>
+                    <div id="conflictAlert" class="alert alert-danger py-2 mt-2 small d-none" style="border-radius: 8px;"></div>
                 </form>
             </div>
             <div class="modal-footer border-top-0 pt-0">
