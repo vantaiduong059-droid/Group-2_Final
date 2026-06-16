@@ -75,7 +75,7 @@
     <div class="col-lg-8">
         <div class="card-modern h-100">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="card-title-modern mb-0">Thống kê học sinh</h5>
+                <h5 class="card-title-modern mb-0">Thống kê sinh viên</h5>
                 <select class="form-select form-select-sm w-auto border-0 bg-light fw-medium text-muted">
                     <option>6 tháng qua</option>
                     <option>Năm nay</option>
@@ -118,11 +118,11 @@
 
 <!-- BOTTOM LISTS -->
 <div class="row g-4">
-    <!-- Cột 1: Học sinh mới nhập học -->
+    <!-- Cột 1: Sinh viên mới nhập học -->
     <div class="col-lg-6">
         <div class="card-modern">
             <div class="d-flex justify-content-between align-items-center mb-4">
-                <h5 class="card-title-modern mb-0">Học sinh mới nhập học</h5>
+                <h5 class="card-title-modern mb-0">Sinh viên mới nhập học</h5>
                 <a href="<?= BASE_URL ?>/admin/students" class="text-decoration-none text-primary fw-medium small">Xem tất cả <i class="bi bi-chevron-right"></i></a>
             </div>
             <div class="table-responsive">
@@ -137,7 +137,7 @@
                     </thead>
                     <tbody>
                         <?php if (empty($newStudents)): ?>
-                        <tr><td colspan="4" class="text-center text-muted">Chưa có dữ liệu học sinh mới</td></tr>
+                        <tr><td colspan="4" class="text-center text-muted">Chưa có dữ liệu sinh viên mới</td></tr>
                         <?php else: ?>
                         <?php foreach($newStudents as $student): ?>
                         <tr>
@@ -167,14 +167,14 @@
                 <div class="card-modern">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h5 class="card-title-modern mb-0">Sự kiện sắp tới</h5>
-                        <a href="#" class="text-decoration-none text-primary fw-medium small">Xem tất cả</a>
+                         <a href="<?= BASE_URL ?>/admin/sessions" class="text-decoration-none text-primary fw-medium small">Xem tất cả</a>
                     </div>
                     
                     <?php if (empty($upcomingEvents)): ?>
                     <div class="text-center text-muted">Không có sự kiện sắp tới.</div>
                     <?php else: ?>
                     <?php foreach($upcomingEvents as $event): ?>
-                    <div class="d-flex align-items-center gap-3 mb-3 p-3 rounded" style="background-color: var(--bg-main);">
+                    <a href="<?= BASE_URL ?>/admin/sessions/<?= $event['id'] ?>/attendance" class="d-flex align-items-center gap-3 mb-3 p-3 rounded text-decoration-none upcoming-event-item" style="background-color: var(--bg-main); transition: all 0.2s ease;">
                         <div class="bg-primary-subtle text-primary rounded d-flex flex-column align-items-center justify-content-center px-3 py-2" style="min-width:60px;">
                             <span class="fw-bold fs-5" style="line-height:1;"><?= date('d', strtotime($event['session_date'])) ?></span>
                             <span class="small">Tháng <?= date('n', strtotime($event['session_date'])) ?></span>
@@ -210,7 +210,7 @@ document.addEventListener("DOMContentLoaded", function() {
         data: {
             labels: ' . $chartLabels . ',
             datasets: [{
-                label: "Học sinh",
+                label: "Sinh viên",
                 data: ' . $chartValues . ',
                 borderColor: "#3b82f6",
                 backgroundColor: gradientLine,
@@ -256,15 +256,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // 2. Vẽ Biểu đồ tròn (Donut Chart)
     const ctxDonut = document.getElementById("attendanceDonutChart").getContext("2d");
+    const hasAttData = ' . ($totalAtt > 0 ? 'true' : 'false') . ';
+    const attDataValues = hasAttData ? [' . (int)$attStats["present"] . ', ' . (int)$attStats["late"] . ', ' . (int)$attStats["absent"] . '] : [1];
+    const attDataColors = hasAttData ? ["#10b981", "#f59e0b", "#ef4444"] : ["#cbd5e1"];
+    const attDataLabels = hasAttData ? ["Có mặt", "Đi muộn", "Vắng mặt"] : ["Chưa có dữ liệu"];
+
     new Chart(ctxDonut, {
         type: "doughnut",
         data: {
-            labels: ["Có mặt", "Đi muộn", "Vắng mặt"],
+            labels: attDataLabels,
             datasets: [{
-                data: [' . $attStats["present"] . ', ' . $attStats["late"] . ', ' . $attStats["absent"] . '],
-                backgroundColor: ["#10b981", "#f59e0b", "#ef4444"],
+                data: attDataValues,
+                backgroundColor: attDataColors,
                 borderWidth: 0,
-                hoverOffset: 4
+                hoverOffset: hasAttData ? 4 : 0
             }]
         },
         options: {
@@ -274,6 +279,7 @@ document.addEventListener("DOMContentLoaded", function() {
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    enabled: hasAttData,
                     backgroundColor: "#1e293b",
                     padding: 10,
                     bodyFont: { family: "Inter", size: 13 },
@@ -290,7 +296,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 ctx.font = "bold " + fontSize + "em Inter";
                 ctx.textBaseline = "middle";
                 ctx.fillStyle = "#0f172a";
-                var text = "' . number_format($totalAtt) . '",
+                var text = hasAttData ? "' . number_format($totalAtt) . '" : "0",
                     textX = Math.round((width - ctx.measureText(text).width) / 2),
                     textY = height / 2 - 10;
                 ctx.fillText(text, textX, textY);
