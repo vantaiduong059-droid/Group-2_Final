@@ -12,6 +12,14 @@ class StudentController extends Controller {
     }
 
     public function dashboard() {
-        $this->view('student/dashboard', ['title' => 'Student Dashboard']);
+        $this->view('student/dashboard', ['title' => 'Chuyên cần & Tương tác']);
+    }
+
+    public function schedule() {
+        $this->view('student/schedule', ['title' => 'Lịch học']);
+    }
+
+    public function myCourses() {
+        $this->view('student/my_courses', ['title' => 'Học phần của tôi']);
     }
 }
