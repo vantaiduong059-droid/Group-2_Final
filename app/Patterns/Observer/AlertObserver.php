@@ -34,8 +34,18 @@ class AlertObserver implements ObserverInterface {
             $absentCount = (int)$countRow['absent_count'];
             
             if ($absentCount >= 3) {
-                $message = "Học sinh vắng học quá nhiều: Đã vắng $absentCount buổi học trong lớp phần này!";
-                $this->createAlertIfNotExists($db, $studentId, $courseId, $message);
+                // Lấy tên sinh viên
+                $stmtName = $db->prepare("SELECT full_name FROM users WHERE id = ?");
+                $stmtName->execute([$studentId]);
+                $studentName = $stmtName->fetchColumn();
+                
+                $msgForStudent = "Cảnh báo học tập: Bạn đã vắng $absentCount buổi học trong học phần này. Hãy liên hệ giảng viên để được hỗ trợ!";
+                $msgForTeacher = "Cảnh báo chuyên cần: Sinh viên $studentName đã vắng $absentCount buổi học trong học phần này!";
+                
+                // Gửi cảnh báo cho sinh viên
+                $this->createAlertIfNotExists($db, $studentId, $courseId, $msgForStudent);
+                // Gửi cảnh báo cho giảng viên (cố vấn học tập)
+                $this->createTeacherAlert($db, $courseId, $msgForTeacher);
             }
         }
 
@@ -47,25 +57,44 @@ class AlertObserver implements ObserverInterface {
         if ($scoreRow) {
             $cpi = (int)$scoreRow['total_score'];
             if ($cpi < 50) {
-                $message = "Cảnh báo học tập: Chỉ số tham gia lớp học (CPI) hiện tại quá thấp ($cpi/100). Cần cải thiện chuyên cần và phát biểu!";
-                $this->createAlertIfNotExists($db, $studentId, $courseId, $message);
+                // Lấy tên sinh viên
+                $stmtName = $db->prepare("SELECT full_name FROM users WHERE id = ?");
+                $stmtName->execute([$studentId]);
+                $studentName = $stmtName->fetchColumn();
+                
+                $msgForStudent = "Cảnh báo học tập: Chỉ số tham gia lớp học (CPI) hiện tại của bạn là $cpi/100 - quá thấp. Cần cải thiện chuyên cần và phát biểu!";
+                $msgForTeacher = "Cảnh báo CPI thấp: Sinh viên $studentName có chỉ số tham gia (CPI) chỉ $cpi/100 trong học phần này.";
+                
+                $this->createAlertIfNotExists($db, $studentId, $courseId, $msgForStudent);
+                $this->createTeacherAlert($db, $courseId, $msgForTeacher);
             }
         }
     }
     
-    private function createAlertIfNotExists($db, $studentId, $courseId, $message) {
+    private function createAlertIfNotExists($db, $userId, $courseId, $message) {
         // Kiểm tra xem đã cảnh báo với thông điệp tương tự chưa để tránh spam
         $stmtCheck = $db->prepare("
             SELECT id FROM alerts 
             WHERE user_id = ? AND course_id = ? AND message = ? AND is_read = 0
         ");
-        $stmtCheck->execute([$studentId, $courseId, $message]);
+        $stmtCheck->execute([$userId, $courseId, $message]);
         if (!$stmtCheck->fetch()) {
             $stmtInsert = $db->prepare("
                 INSERT INTO alerts (user_id, course_id, message, is_read, created_at) 
                 VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)
             ");
-            $stmtInsert->execute([$studentId, $courseId, $message]);
+            $stmtInsert->execute([$userId, $courseId, $message]);
+        }
+    }
+
+    private function createTeacherAlert($db, $courseId, $message) {
+        // Lấy teacher_id của khóa học
+        $stmt = $db->prepare("SELECT teacher_id FROM courses WHERE id = ? AND teacher_id IS NOT NULL");
+        $stmt->execute([$courseId]);
+        $teacherId = $stmt->fetchColumn();
+        
+        if ($teacherId) {
+            $this->createAlertIfNotExists($db, $teacherId, $courseId, $message);
         }
     }
 }

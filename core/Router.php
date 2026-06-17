@@ -36,6 +36,11 @@ class Router {
             $uri = substr($uri, strlen($scriptName));
         }
 
+        // Loại bỏ /index.php nếu truy cập trực tiếp qua index.php trong URL
+        if (strpos($uri, '/index.php') === 0) {
+            $uri = substr($uri, 10);
+        }
+
         $uri = rtrim($uri, '/');
         if (empty($uri)) {
             $uri = '/'; // route mặc định
