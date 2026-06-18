@@ -28,6 +28,21 @@
 
 <!-- CONTAINER CHÍNH (Hiển thị khi chọn Khóa học) -->
 <div class="d-none" id="mainDashboardContainer">
+    <!-- Auto-refresh status bar -->
+    <div class="d-flex align-items-center gap-2 mb-3 px-1" id="autoRefreshBar" style="font-size:0.8rem;color:#64748b;">
+        <div id="refreshSpinner" class="d-none">
+            <div class="spinner-border spinner-border-sm text-primary" role="status" style="width:14px;height:14px;border-width:2px;"></div>
+        </div>
+        <i class="bi bi-arrow-clockwise text-success" id="refreshIdleIcon"></i>
+        <span id="refreshStatusText">Cập nhật lúc <span id="lastUpdatedTime">—</span></span>
+        <span class="text-muted mx-1">·</span>
+        <span>Tự làm mới sau <span class="fw-semibold text-primary" id="countdownLabel">30</span>s</span>
+        <button class="btn btn-link btn-sm p-0 ms-1" id="btnManualRefresh" title="Làm mới ngay" style="font-size:0.8rem;color:#3b82f6;text-decoration:none;">
+            <i class="bi bi-arrow-clockwise"></i> Làm mới
+        </button>
+        <span class="badge bg-warning-subtle text-warning d-none" id="pausedBadge" style="font-size:0.7rem;"><i class="bi bi-pause-circle me-1"></i>Tạm dừng (tab ẩn)</span>
+    </div>
+
     <!-- TABS -->
     <ul class="nav nav-tabs border-0 mb-4 bg-white p-2 rounded shadow-sm gap-2" id="teacherTabs" role="tablist" style="border-radius: var(--radius-md) !important;">
         <li class="nav-item" role="presentation">
@@ -384,6 +399,107 @@ document.addEventListener("DOMContentLoaded", function() {
     let currentQuizId = null;
     let countdownInterval = null;
     
+    // ============================================
+    // AUTO-POLLING CONFIG
+    // ============================================
+    const POLL_INTERVAL = 30; // giây
+    let pollCountdown = POLL_INTERVAL;
+    let pollTimer = null;
+    let isPaused = false;
+
+    function formatTime(date) {
+        return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function setRefreshing(loading) {
+        const spinner = document.getElementById("refreshSpinner");
+        const idleIcon = document.getElementById("refreshIdleIcon");
+        const btnManual = document.getElementById("btnManualRefresh");
+        if (spinner) spinner.classList.toggle("d-none", !loading);
+        if (idleIcon) idleIcon.classList.toggle("d-none", loading);
+        if (btnManual) btnManual.disabled = loading;
+    }
+
+    function pollActiveTabData() {
+        if (!currentCourseId) return Promise.resolve();
+        
+        setRefreshing(true);
+        const activeTab = document.querySelector("#teacherTabs .nav-link.active");
+        let promise = Promise.resolve();
+
+        if (activeTab) {
+            if (activeTab.id === "sessions-tab") {
+                let p1 = loadSessionsList(currentCourseId);
+                let p2 = currentSessionId ? loadSessionAttendance(currentSessionId) : Promise.resolve();
+                promise = Promise.all([p1, p2]);
+            } else if (activeTab.id === "quizzes-tab") {
+                let p1 = loadQuizzesHistory(currentCourseId);
+                let p2 = currentQuizId ? showQuizSubmissions(currentQuizId) : Promise.resolve();
+                promise = Promise.all([p1, p2]);
+            } else if (activeTab.id === "grades-tab") {
+                promise = loadCPITable(currentCourseId);
+            }
+        }
+
+        return promise
+            .then(() => {
+                setRefreshing(false);
+                const timeEl = document.getElementById("lastUpdatedTime");
+                if (timeEl) timeEl.innerText = formatTime(new Date());
+                pollCountdown = POLL_INTERVAL;
+                const label = document.getElementById("countdownLabel");
+                if (label) label.innerText = pollCountdown;
+            })
+            .catch(err => {
+                setRefreshing(false);
+                console.warn("Auto-polling error:", err);
+                const timeEl = document.getElementById("lastUpdatedTime");
+                if (timeEl) timeEl.innerHTML = '<span class="text-danger"><i class="bi bi-wifi-off me-1"></i>Mất kết nối</span>';
+            });
+    }
+
+    function startPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollCountdown = POLL_INTERVAL;
+        const label = document.getElementById("countdownLabel");
+        if (label) label.innerText = pollCountdown;
+        const timeEl = document.getElementById("lastUpdatedTime");
+        if (timeEl && timeEl.innerText === "—") {
+            timeEl.innerText = formatTime(new Date());
+        }
+
+        pollTimer = setInterval(() => {
+            if (isPaused) return;
+            pollCountdown--;
+            const label = document.getElementById("countdownLabel");
+            if (label) label.innerText = pollCountdown;
+
+            if (pollCountdown <= 0) {
+                pollCountdown = POLL_INTERVAL;
+                pollActiveTabData();
+            }
+        }, 1000);
+    }
+
+    // Tạm dừng khi ẩn tab (tiết kiệm tài nguyên)
+    document.addEventListener("visibilitychange", () => {
+        isPaused = document.hidden;
+        const pausedBadge = document.getElementById("pausedBadge");
+        if (pausedBadge) pausedBadge.classList.toggle("d-none", !isPaused);
+        if (!isPaused && currentCourseId) {
+            pollCountdown = POLL_INTERVAL;
+            pollActiveTabData();
+        }
+    });
+
+    // Nút làm mới thủ công
+    document.getElementById("btnManualRefresh").addEventListener("click", () => {
+        pollCountdown = POLL_INTERVAL;
+        const label = document.getElementById("countdownLabel");
+        if (label) label.innerText = pollCountdown;
+        pollActiveTabData();
+    });
+    
     // Cập nhật Trọng số tự động (Tổng = 100)
     const weightAttendance = document.getElementById("weightAttendance");
     const weightQuiz = document.getElementById("weightQuiz");
@@ -409,6 +525,9 @@ document.addEventListener("DOMContentLoaded", function() {
         
         // Tải dữ liệu lớp học phần
         loadCourseData(currentCourseId);
+        
+        // Khởi động auto-polling
+        startPolling();
     });
     
     // Nút làm mới danh sách buổi học
@@ -419,7 +538,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Tải dữ liệu của khóa học
     function loadCourseData(courseId) {
         // Tải danh sách buổi học & rules qua API
-        fetch(BASE_URL + "/api/courses/" + courseId)
+        return fetch(BASE_URL + "/api/courses/" + courseId)
             .then(res => res.json())
             .then(res => {
                 if (res.status === "success") {
@@ -447,7 +566,7 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     function fetchSessionsForQuizSelect(courseId) {
-        fetch(BASE_URL + "/api/sessions")
+        return fetch(BASE_URL + "/api/sessions")
             .then(res => res.json())
             .then(res => {
                 if(res.status === "success") {
@@ -466,7 +585,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Tải danh sách buổi học
     function loadSessionsList(courseId) {
-        fetch(BASE_URL + "/api/sessions")
+        return fetch(BASE_URL + "/api/sessions")
             .then(res => res.json())
             .then(res => {
                 if (res.status === "success") {
@@ -526,7 +645,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("sessionDetailPlaceholder").classList.add("d-none");
         document.getElementById("sessionDetailContainer").classList.remove("d-none");
         
-        fetch(BASE_URL + "/api/sessions")
+        return fetch(BASE_URL + "/api/sessions")
             .then(res => res.json())
             .then(res => {
                 if(res.status === "success") {
@@ -633,7 +752,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
     // Tải danh sách học sinh điểm danh của buổi học
     function loadSessionAttendance(sessionId) {
-        fetch(BASE_URL + "/api/sessions/" + sessionId + "/attendance")
+        return fetch(BASE_URL + "/api/sessions/" + sessionId + "/attendance")
             .then(res => res.json())
             .then(res => {
                 if (res.status === "success") {
@@ -857,7 +976,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Tải danh sách quiz đã kích hoạt
     function loadQuizzesHistory(courseId) {
         // Ta cần duyệt các buổi học của Course để tìm quiz
-        fetch(BASE_URL + "/api/sessions")
+        return fetch(BASE_URL + "/api/sessions")
             .then(res => res.json())
             .then(res => {
                 if (res.status === "success") {
@@ -879,7 +998,7 @@ document.addEventListener("DOMContentLoaded", function() {
                         fetch(BASE_URL + "/api/quizzes?session_id=" + sid).then(r => r.json())
                     );
                     
-                    Promise.all(promises).then(results => {
+                    return Promise.all(promises).then(results => {
                         let allQuizzes = [];
                         results.forEach(res => {
                             if (res.status === "success") allQuizzes = allQuizzes.concat(res.data);
@@ -929,7 +1048,7 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("quizSubmissionsContainer").classList.remove("d-none");
         
         // Fetch chi tiết quiz và bài nộp
-        fetch(BASE_URL + "/api/quizzes/" + quizId + "/submissions")
+        return fetch(BASE_URL + "/api/quizzes/" + quizId + "/submissions")
             .then(res => res.json())
             .then(res => {
                 if (res.status === "success") {
@@ -984,7 +1103,7 @@ document.addEventListener("DOMContentLoaded", function() {
     // Tải bảng điểm CPI của lớp
     function loadCPITable(courseId) {
         // Đồng bộ CPI trước bằng POST
-        fetch(BASE_URL + "/api/engagement/calculate", {
+        return fetch(BASE_URL + "/api/engagement/calculate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ course_id: courseId })

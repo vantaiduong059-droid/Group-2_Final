@@ -1,6 +1,6 @@
 <?php ob_start(); ?>
 
-<div class="d-flex justify-content-between align-items-end mb-4">
+<div class="d-flex justify-content-between align-items-end mb-3">
     <div>
         <h2 class="fw-bold mb-1" style="color: var(--text-main);">Chuyên cần &amp; Tương tác cá nhân</h2>
         <div class="text-muted">Xin chào, <span class="fw-medium text-dark"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>!</div>
@@ -8,6 +8,21 @@
     <button class="btn btn-outline-primary rounded-pill px-4 py-2 d-flex align-items-center gap-2" id="btnOpenLeaveRequest">
         <i class="bi bi-calendar-x"></i> Xin phép vắng
     </button>
+</div>
+
+<!-- Auto-refresh status bar -->
+<div class="d-flex align-items-center gap-2 mb-3 px-1" id="autoRefreshBar" style="font-size:0.8rem;color:#64748b;">
+    <div id="refreshSpinner" class="d-none">
+        <div class="spinner-border spinner-border-sm text-primary" role="status" style="width:14px;height:14px;border-width:2px;"></div>
+    </div>
+    <i class="bi bi-arrow-clockwise text-success" id="refreshIdleIcon"></i>
+    <span id="refreshStatusText">Cập nhật lúc <span id="lastUpdatedTime">—</span></span>
+    <span class="text-muted mx-1">·</span>
+    <span>Tự làm mới sau <span class="fw-semibold text-primary" id="countdownLabel">30</span>s</span>
+    <button class="btn btn-link btn-sm p-0 ms-1" id="btnManualRefresh" title="Làm mới ngay" style="font-size:0.8rem;color:#3b82f6;text-decoration:none;">
+        <i class="bi bi-arrow-clockwise"></i> Làm mới
+    </button>
+    <span class="badge bg-warning-subtle text-warning d-none" id="pausedBadge" style="font-size:0.7rem;"><i class="bi bi-pause-circle me-1"></i>Tạm dừng (tab ẩn)</span>
 </div>
 
 <!-- CONTAINER CẢNH BÁO TỪ ALERT ENGINE -->
@@ -363,12 +378,80 @@ document.addEventListener("DOMContentLoaded", function() {
     const qrTokenFromUrl = urlParams.get("qr_token");
     const sessionIdFromUrl = urlParams.get("session_id");
 
+    // ============================================
+    // AUTO-POLLING: Tự động làm mới mỗi 30 giây
+    // ============================================
+    const POLL_INTERVAL = 30; // giây
+    let pollCountdown = POLL_INTERVAL;
+    let pollTimer = null;
+    let isPaused = false;
+
+    function formatTime(date) {
+        return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    }
+
+    function setRefreshing(loading) {
+        document.getElementById("refreshSpinner").classList.toggle("d-none", !loading);
+        document.getElementById("refreshIdleIcon").classList.toggle("d-none", loading);
+        document.getElementById("btnManualRefresh").disabled = loading;
+    }
+
+    function startPolling() {
+        if (pollTimer) clearInterval(pollTimer);
+        pollCountdown = POLL_INTERVAL;
+        document.getElementById("countdownLabel").innerText = pollCountdown;
+
+        pollTimer = setInterval(() => {
+            if (isPaused) return;
+            pollCountdown--;
+            const label = document.getElementById("countdownLabel");
+            if (label) label.innerText = pollCountdown;
+
+            if (pollCountdown <= 0) {
+                pollCountdown = POLL_INTERVAL;
+                loadDashboardData();
+            }
+        }, 1000);
+    }
+
+    // Pause khi tab ẩn (tiết kiệm pin điện thoại)
+    document.addEventListener("visibilitychange", () => {
+        isPaused = document.hidden;
+        const pausedBadge = document.getElementById("pausedBadge");
+        if (pausedBadge) pausedBadge.classList.toggle("d-none", !isPaused);
+        if (!isPaused) {
+            // Khi mở lại tab → load ngay
+            pollCountdown = POLL_INTERVAL;
+            loadDashboardData();
+        }
+    });
+
+    // Nút làm mới thủ công
+    document.getElementById("btnManualRefresh").addEventListener("click", () => {
+        pollCountdown = POLL_INTERVAL;
+        if (document.getElementById("countdownLabel"))
+            document.getElementById("countdownLabel").innerText = pollCountdown;
+        loadDashboardData();
+    });
+
+    // Khởi chạy
     loadDashboardData();
+    startPolling();
 
     function loadDashboardData() {
+        setRefreshing(true);
         fetch(BASE_URL + "/api/student/dashboard-data")
             .then(res => res.json())
             .then(res => {
+                setRefreshing(false);
+                // Cập nhật giờ làm mới
+                const timeEl = document.getElementById("lastUpdatedTime");
+                if (timeEl) timeEl.innerText = formatTime(new Date());
+                // Reset countdown
+                pollCountdown = POLL_INTERVAL;
+                const label = document.getElementById("countdownLabel");
+                if (label) label.innerText = pollCountdown;
+
                 if (res.status === "success") {
                     const data = res.data;
                     renderAlertBanners(data.alerts);
@@ -386,7 +469,13 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
             })
-            .catch(err => console.error("Dashboard load error:", err));
+            .catch(err => {
+                setRefreshing(false);
+                console.warn("Dashboard load error:", err);
+                // Hiện badge offline nếu mất mạng
+                const timeEl = document.getElementById("lastUpdatedTime");
+                if (timeEl) timeEl.innerHTML = '<span class="text-danger"><i class="bi bi-wifi-off me-1"></i>Mất kết nối</span>';
+            });
     }
 
     // Cảnh báo Alert Engine
