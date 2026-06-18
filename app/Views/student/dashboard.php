@@ -18,11 +18,9 @@
     <i class="bi bi-arrow-clockwise text-success" id="refreshIdleIcon"></i>
     <span id="refreshStatusText">Cập nhật lúc <span id="lastUpdatedTime">—</span></span>
     <span class="text-muted mx-1">·</span>
-    <span>Tự làm mới sau <span class="fw-semibold text-primary" id="countdownLabel">30</span>s</span>
-    <button class="btn btn-link btn-sm p-0 ms-1" id="btnManualRefresh" title="Làm mới ngay" style="font-size:0.8rem;color:#3b82f6;text-decoration:none;">
-        <i class="bi bi-arrow-clockwise"></i> Làm mới
+    <button class="btn btn-outline-primary btn-sm px-3 py-1 rounded-pill d-flex align-items-center gap-1" id="btnManualRefresh" title="Đồng bộ ngay">
+        <i class="bi bi-arrow-clockwise"></i> Đồng bộ dữ liệu
     </button>
-    <span class="badge bg-warning-subtle text-warning d-none" id="pausedBadge" style="font-size:0.7rem;"><i class="bi bi-pause-circle me-1"></i>Tạm dừng (tab ẩn)</span>
 </div>
 
 <!-- CONTAINER CẢNH BÁO TỪ ALERT ENGINE -->
@@ -379,13 +377,8 @@ document.addEventListener("DOMContentLoaded", function() {
     const sessionIdFromUrl = urlParams.get("session_id");
 
     // ============================================
-    // AUTO-POLLING: Tự động làm mới mỗi 30 giây
+    // SYNC MECHANISM: Đồng bộ thủ công qua nút ấn
     // ============================================
-    const POLL_INTERVAL = 30; // giây
-    let pollCountdown = POLL_INTERVAL;
-    let pollTimer = null;
-    let isPaused = false;
-
     function formatTime(date) {
         return date.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
     }
@@ -396,47 +389,13 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById("btnManualRefresh").disabled = loading;
     }
 
-    function startPolling() {
-        if (pollTimer) clearInterval(pollTimer);
-        pollCountdown = POLL_INTERVAL;
-        document.getElementById("countdownLabel").innerText = pollCountdown;
-
-        pollTimer = setInterval(() => {
-            if (isPaused) return;
-            pollCountdown--;
-            const label = document.getElementById("countdownLabel");
-            if (label) label.innerText = pollCountdown;
-
-            if (pollCountdown <= 0) {
-                pollCountdown = POLL_INTERVAL;
-                loadDashboardData();
-            }
-        }, 1000);
-    }
-
-    // Pause khi tab ẩn (tiết kiệm pin điện thoại)
-    document.addEventListener("visibilitychange", () => {
-        isPaused = document.hidden;
-        const pausedBadge = document.getElementById("pausedBadge");
-        if (pausedBadge) pausedBadge.classList.toggle("d-none", !isPaused);
-        if (!isPaused) {
-            // Khi mở lại tab → load ngay
-            pollCountdown = POLL_INTERVAL;
-            loadDashboardData();
-        }
-    });
-
     // Nút làm mới thủ công
     document.getElementById("btnManualRefresh").addEventListener("click", () => {
-        pollCountdown = POLL_INTERVAL;
-        if (document.getElementById("countdownLabel"))
-            document.getElementById("countdownLabel").innerText = pollCountdown;
         loadDashboardData();
     });
 
     // Khởi chạy
     loadDashboardData();
-    startPolling();
 
     function loadDashboardData() {
         setRefreshing(true);
@@ -447,10 +406,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 // Cập nhật giờ làm mới
                 const timeEl = document.getElementById("lastUpdatedTime");
                 if (timeEl) timeEl.innerText = formatTime(new Date());
-                // Reset countdown
-                pollCountdown = POLL_INTERVAL;
-                const label = document.getElementById("countdownLabel");
-                if (label) label.innerText = pollCountdown;
 
                 if (res.status === "success") {
                     const data = res.data;
