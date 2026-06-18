@@ -75,10 +75,10 @@
         </div>
     </div>
 
-    <!-- Đã điểm danh rồi -->
+    <!-- Đã điểm danh rồi + Nút Tương tác -->
     <div class="col-lg-6 d-none" id="alreadyAttendedBox">
         <div class="card-modern" style="border: 2px solid var(--success); background: #f0fdf4;">
-            <div class="d-flex align-items-center gap-3">
+            <div class="d-flex align-items-center gap-3 mb-3">
                 <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center" style="width:48px;height:48px;flex-shrink:0;">
                     <i class="bi bi-check-lg fs-4"></i>
                 </div>
@@ -86,6 +86,21 @@
                     <div class="fw-bold text-success fs-6">Đã điểm danh thành công!</div>
                     <div class="text-muted small" id="alreadyAttendedSessionName">Buổi học đang diễn ra</div>
                     <div class="text-muted small">Trạng thái: <span class="fw-semibold" id="alreadyAttendedStatus"></span></div>
+                </div>
+            </div>
+            <!-- Nút tương tác lớp học -->
+            <div class="border-top pt-3">
+                <div class="small fw-semibold text-muted mb-2"><i class="bi bi-hand-index-thumb me-1"></i>Tương tác trong buổi học (cộng điểm CPI)</div>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-outline-primary btn-sm rounded-pill flex-fill" onclick="logInteraction('question')">
+                        <i class="bi bi-question-circle me-1"></i>Đặt câu hỏi <span class="badge bg-primary ms-1">+1</span>
+                    </button>
+                    <button class="btn btn-outline-success btn-sm rounded-pill flex-fill" onclick="logInteraction('answer')">
+                        <i class="bi bi-chat-dots me-1"></i>Trả lời <span class="badge bg-success ms-1">+2</span>
+                    </button>
+                    <button class="btn btn-outline-info btn-sm rounded-pill flex-fill" onclick="logInteraction('discussion')">
+                        <i class="bi bi-people me-1"></i>Thảo luận <span class="badge bg-info ms-1">+1</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -359,7 +374,7 @@ document.addEventListener("DOMContentLoaded", function() {
                     renderAlertBanners(data.alerts);
                     renderStatsSummary(data.attendanceSummary);
                     renderCoursesTable(data.courses, data.scores, data.attendanceSummary);
-                    renderAttendanceTable(data.history);
+                    renderAttendanceTable(data.history.slice(0, 10));
                     renderQuizHistory(data.quizHistory);
                     renderLeaveRequests(data.myLeaveRequests);
                     handleActiveSessions(data.activeSessions);
@@ -521,9 +536,9 @@ document.addEventListener("DOMContentLoaded", function() {
         leaves.forEach(lr => {
             const row = document.createElement("tr");
             let statusBadge = "";
-            if (lr.status === "pending") statusBadge = "<span class='badge bg-warning text-dark'>Chờ duyệt</span>";
-            else if (lr.status === "approved") statusBadge = "<span class='badge bg-success'>Đã duyệt</span>";
-            else statusBadge = "<span class='badge bg-danger'>Từ chối</span>";
+            if (lr.status === "pending")  statusBadge = "<span class='badge bg-warning text-dark'><i class='bi bi-hourglass-split me-1'></i>Chờ duyệt</span>";
+            else if (lr.status === "approved") statusBadge = "<span class='badge bg-success'><i class='bi bi-check-circle me-1'></i>Đã duyệt</span>";
+            else statusBadge = "<span class='badge bg-danger'><i class='bi bi-x-circle me-1'></i>Từ chối</span>";
             row.innerHTML = `
                 <td class="fw-medium">${formatDate(lr.session_date)}</td>
                 <td class="text-muted small">${escHtml(lr.course_name)}</td>
@@ -661,6 +676,24 @@ document.addEventListener("DOMContentLoaded", function() {
             }
         });
     });
+
+    // Log tương tác của sinh viên (Hỏi / Trả lời / Thảo luận)
+    window.logInteraction = function(type) {
+        if (!activeSession) { showToast("Tương tác", "Không có buổi học đang diễn ra.", "warning"); return; }
+        const typeLabel = { question: "đặt câu hỏi", answer: "trả lời", discussion: "thảo luận" }[type] || type;
+        fetch(BASE_URL + "/api/student/interaction", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ session_id: activeSession.id, type: type })
+        }).then(r => r.json()).then(res => {
+            if (res.status === "success") {
+                showToast("Tương tác", res.message, "success");
+                loadDashboardData();
+            } else {
+                showToast("Lỗi", res.message, "danger");
+            }
+        });
+    };
 
     // Quiz
     document.getElementById("btnStartQuiz").addEventListener("click", function() {

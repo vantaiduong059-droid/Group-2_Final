@@ -22,4 +22,8 @@ class StudentController extends Controller {
     public function myCourses() {
         $this->view('student/my_courses', ['title' => 'Học phần của tôi']);
     }
+
+    public function profile() {
+        $this->view('student/profile', ['title' => 'Hồ sơ cá nhân']);
+    }
 }

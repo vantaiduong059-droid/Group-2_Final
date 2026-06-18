@@ -29,6 +29,8 @@
                         <th>Môn học</th>
                         <th>Giảng viên</th>
                         <th>Giờ học</th>
+                        <th>Phòng học</th>
+                        <th class="text-center">Tiết</th>
                         <th class="text-center">Trạng thái</th>
                     </tr>
                 </thead>
@@ -97,6 +99,8 @@ document.addEventListener("DOMContentLoaded", function() {
                 </td>
                 <td class="text-muted small">${esc(s.teacher_name || "—")}</td>
                 <td class="text-muted small"><i class="bi bi-clock me-1"></i>${startTime} — ${endTime}</td>
+                <td class="small">${s.room ? `<i class="bi bi-door-open me-1 text-muted"></i>${esc(s.room)}` : '—'}</td>
+                <td class="text-center text-muted small">${s.period ? `Tiết ${esc(s.period)}` : '—'}</td>
                 <td class="text-center">${statusBadge}</td>
             `;
             tbody.appendChild(row);
@@ -141,6 +145,8 @@ document.addEventListener("DOMContentLoaded", function() {
                             <div class="p-2 rounded" style="background:var(--bg-card-alt,#f8fafc);border-left:3px solid var(--primary);">
                                 <div class="fw-semibold small">${esc(s.course_code)}</div>
                                 <div class="text-muted" style="font-size:0.75rem;">${s.start_time ? s.start_time.substring(0,5) : "—"} — ${s.end_time ? s.end_time.substring(0,5) : "—"}</div>
+                                ${s.room ? `<div class="text-muted" style="font-size:0.7rem;"><i class="bi bi-door-open me-1"></i>${esc(s.room)}</div>` : ''}
+                                ${s.period ? `<div class="text-muted" style="font-size:0.7rem;"><i class="bi bi-clock me-1"></i>Tiết ${esc(s.period)}</div>` : ''}
                             </div>
                         `).join("") || '<div class="text-muted small py-2 text-center">Không có lịch</div>'}
                     </div>

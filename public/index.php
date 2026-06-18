@@ -41,6 +41,7 @@ $router->get('/teacher/dashboard', 'TeacherController@dashboard');
 $router->get('/student/dashboard', 'StudentController@dashboard');
 $router->get('/student/schedule', 'StudentController@schedule');
 $router->get('/student/my-courses', 'StudentController@myCourses');
+$router->get('/student/profile', 'StudentController@profile');
 
 // API Routes cho Fetch/AJAX (Trả về JSON)
 $router->get('/api/courses', 'CourseApiController@index');
@@ -91,6 +92,12 @@ $router->get('/api/quizzes/{id}/submissions', 'QuizApiController@submissions');
 $router->post('/api/interactions', 'InteractionApiController@store');
 $router->post('/api/engagement/calculate', 'EngagementApiController@calculate');
 $router->get('/api/student/dashboard-data', 'StudentApiController@dashboardData');
+$router->post('/api/student/interaction', 'StudentApiController@studentInteraction');
+$router->post('/api/student/change-password', 'StudentApiController@changePassword');
+
+// API Thông báo
+$router->get('/api/notifications', 'NotificationApiController@index');
+$router->post('/api/notifications/mark-read', 'NotificationApiController@markAsRead');
 
 // API Đơn xin phép vắng
 $router->post('/api/leave-requests', 'LeaveRequestApiController@store');

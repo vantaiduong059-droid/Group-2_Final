@@ -1,0 +1,285 @@
+# Kế hoạch Tạo Dữ liệu Test — Student Portal
+
+## Phân tích Hiện trạng Database
+
+> [!CAUTION]
+> **Database hiện tại CÒN THIẾU NGHIÊM TRỌNG:**
+> - `attendance_records` — **TRỐNG**: Không có bản ghi điểm danh nào cả
+> - `interaction_logs` — **TRỐNG**: Không có log tương tác nào
+> - `quiz_submissions` — **TRỐNG**: Không có bài quiz nào được nộp
+> - `alerts` — **TRỐNG**: Không có cảnh báo nào
+> - `leave_requests` — **CHƯA TẠO**: Bảng chưa tồn tại trong database
+> - `engagement_scores` — **Sai dữ liệu**: Tất cả đều là `total_score = 100` (không thực tế)
+
+**Tài khoản test chính:** `student1 / 123456` → ID: **242** (Nguyễn Hải Anh)
+
+Sinh viên này đang học các môn:
+- Course **25** (INS3066 - Trí tuệ nhân tạo cơ bản, GV: teacher1)
+- Course **27** (INS3068 - Cơ sở dữ liệu phân tán, GV: teacher3)
+- Course **30** (INS3072 - Lập trình Web nâng cao, GV: teacher7)
+
+---
+
+## Các Tình huống Test (Test Scenarios)
+
+### 🟢 Tình huống 1: Sinh viên đi học BÌNH THƯỜNG (Baseline)
+**Sinh viên 242 (student1) — Môn INS3066 (course 25)**
+- Có mặt 5 buổi liên tiếp bằng Code/QR
+- Tương tác: hỏi 2 lần, trả lời 2 lần, thảo luận 1 lần
+- Điểm CPI dự kiến: cao (~75-85/100)
+- Không có cảnh báo
+- **Mục đích test:** Dashboard hiển thị đúng khi học tốt
+
+---
+
+### 🔴 Tình huống 2: Sinh viên VẮNG NHIỀU → Kích hoạt Alert
+**Sinh viên 242 (student1) — Môn INS3068 (course 27)**
+- Vắng 4 buổi liên tiếp (vượt ngưỡng 3 buổi)
+- Không tương tác buổi nào
+- CPI thấp < 50 → kích hoạt 2 loại cảnh báo
+- Alert gửi đến cả student1 và teacher3
+- **Mục đích test:** Alert Engine hoạt động, banner cảnh báo xuất hiện
+
+---
+
+### 🟡 Tình huống 3: Sinh viên ĐI MUỘN nhiều lần
+**Sinh viên 242 (student1) — Môn INS3072 (course 30)**
+- 2 buổi có mặt (present), 3 buổi đi muộn (late), 1 buổi vắng (absent)
+- Tương tác ít: chỉ hỏi 1 lần
+- CPI trung bình (~50-60)
+- **Mục đích test:** Phân biệt trạng thái present/late/absent trong lịch sử
+
+---
+
+### 🔵 Tình huống 4: Sinh viên có ĐƠN XIN PHÉP VẮNG
+**Sinh viên 242 (student1) — Môn INS3066 (course 25)**
+- 1 buổi vắng có phép (excused) — đã gửi leave request được approved
+- 1 đơn xin phép đang pending
+- 1 đơn xin phép bị rejected
+- **Mục đích test:** Modal xin phép, lịch sử đơn, trạng thái pending/approved/rejected
+
+---
+
+### 🟣 Tình huống 5: Sinh viên làm QUIZ
+**Sinh viên 242 (student1) — các môn có quiz**
+- Nộp 2 bài quiz: 1 điểm cao (8.5/10), 1 điểm thấp (4.0/10)
+- **Mục đích test:** Lịch sử quiz hiển thị đúng
+
+---
+
+### 🟠 Tình huống 6: BUỔI HỌC ĐANG DIỄN RA (Active Session)
+- 1 buổi học có status = 'active' với attendance_code = '123456'
+- attendance_expires_at trong tương lai
+- Sinh viên 242 CHƯA điểm danh buổi này
+- **Mục đích test:** Hộp điểm danh xuất hiện, nhập code → thành công
+
+---
+
+## File SQL Cần Tạo
+
+### Bước 1: Tạo bảng leave_requests (nếu chưa có)
+
+```sql
+CREATE TABLE IF NOT EXISTS `leave_requests` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `student_id` INT NOT NULL,
+  `session_id` INT NOT NULL,
+  `reason` TEXT NOT NULL,
+  `status` ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`student_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`session_id`) REFERENCES `class_sessions`(`id`) ON DELETE CASCADE
+);
+```
+
+### Bước 2: Tạo dữ liệu attendance_records
+
+**Student1 (id=242) — Course 25 (INS3066, sessions 49-56):**
+```sql
+-- Buổi 49: Có mặt (QR)
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (49, 242, 1, 'present');
+-- Buổi 50: Có mặt (Code)
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (50, 242, 2, 'present');
+-- Buổi 51: Có mặt (QR)
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (51, 242, 1, 'present');
+-- Buổi 52: Đi muộn (Manual)
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (52, 242, 3, 'late');
+-- Buổi 53: Vắng có phép (excused)
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (53, 242, 3, 'excused');
+```
+
+**Student1 (id=242) — Course 27 (INS3068, sessions bị vắng):**
+```sql
+-- Vắng 4 buổi liên tiếp → kích hoạt alert
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (97, 242, 3, 'absent');
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (98, 242, 3, 'absent');
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (99, 242, 3, 'absent');
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (100, 242, 3, 'absent');
+```
+
+**Student1 (id=242) — Course 30 (INS3072, sessions hỗn hợp):**
+```sql
+-- 2 buổi có mặt
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (157, 242, 2, 'present');
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (158, 242, 1, 'present');
+-- 3 buổi đi muộn
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (159, 242, 3, 'late');
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (160, 242, 3, 'late');
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (161, 242, 3, 'late');
+-- 1 buổi vắng
+INSERT INTO `attendance_records` (session_id, student_id, method_id, status) 
+VALUES (162, 242, 3, 'absent');
+```
+
+### Bước 3: Tạo interaction_logs
+
+```sql
+-- Student1 tương tác tốt trong Course 25
+INSERT INTO `interaction_logs` (session_id, student_id, type, points_awarded) VALUES (49, 242, 'question', 1);
+INSERT INTO `interaction_logs` (session_id, student_id, type, points_awarded) VALUES (49, 242, 'answer', 2);
+INSERT INTO `interaction_logs` (session_id, student_id, type, points_awarded) VALUES (50, 242, 'discussion', 1);
+INSERT INTO `interaction_logs` (session_id, student_id, type, points_awarded) VALUES (51, 242, 'question', 1);
+INSERT INTO `interaction_logs` (session_id, student_id, type, points_awarded) VALUES (52, 242, 'answer', 2);
+
+-- Student1 ít tương tác trong Course 30
+INSERT INTO `interaction_logs` (session_id, student_id, type, points_awarded) VALUES (157, 242, 'question', 1);
+```
+
+### Bước 4: Tạo quiz_submissions
+
+```sql
+-- Cần tạo quiz_sessions trước (nếu chưa có)
+INSERT INTO `quiz_sessions` (session_id, title, start_time, end_time, total_marks)
+VALUES (49, 'Quiz 1 - AI cơ bản', '2026-05-12 10:00:00', '2026-05-12 10:15:00', 10)
+ON DUPLICATE KEY UPDATE id=id;
+
+INSERT INTO `quiz_sessions` (session_id, title, start_time, end_time, total_marks)
+VALUES (50, 'Quiz 2 - Thuật toán tìm kiếm', '2026-05-19 10:00:00', '2026-05-19 10:15:00', 10)
+ON DUPLICATE KEY UPDATE id=id;
+
+-- Bài nộp của student1
+INSERT INTO `quiz_submissions` (quiz_id, student_id, score)
+SELECT id, 242, 8.5 FROM quiz_sessions WHERE session_id = 49 LIMIT 1;
+
+INSERT INTO `quiz_submissions` (quiz_id, student_id, score)
+SELECT id, 242, 4.0 FROM quiz_sessions WHERE session_id = 50 LIMIT 1;
+```
+
+### Bước 5: Tạo alerts (cảnh báo vắng nhiều)
+
+```sql
+-- Cảnh báo cho student1 (vắng 4 buổi môn 27)
+INSERT INTO `alerts` (user_id, course_id, message, is_read)
+VALUES (242, 27, 'Bạn đã vắng 4 buổi trong môn Cơ sở dữ liệu phân tán (vượt ngưỡng cho phép 3 buổi). Hãy liên hệ giảng viên ngay.', FALSE);
+
+-- Cảnh báo CPI thấp cho student1
+INSERT INTO `alerts` (user_id, course_id, message, is_read)
+VALUES (242, 27, 'Điểm CPI của bạn trong môn Cơ sở dữ liệu phân tán hiện tại dưới 50/100. Hãy tham gia tích cực hơn.', FALSE);
+
+-- Cảnh báo gửi đến giảng viên teacher3 (id=234) về student1
+INSERT INTO `alerts` (user_id, course_id, message, is_read)
+VALUES (234, 27, 'Sinh viên Nguyễn Hải Anh (student1) đã vắng 4 buổi trong môn của bạn. Cần liên hệ hỗ trợ.', FALSE);
+```
+
+### Bước 6: Tạo leave_requests
+
+```sql
+-- Đơn đã được approved (buổi 53 đã excused)
+INSERT INTO `leave_requests` (student_id, session_id, reason, status)
+VALUES (242, 53, 'Tôi bị ốm và có giấy xác nhận của bệnh viện. Kính mong thầy/cô xem xét cho phép vắng có phép.', 'approved');
+
+-- Đơn đang pending (buổi tương lai)
+INSERT INTO `leave_requests` (student_id, session_id, reason, status)
+VALUES (242, 54, 'Gia đình có việc đột xuất, tôi xin phép nghỉ buổi học ngày mai.', 'pending');
+
+-- Đơn bị rejected
+INSERT INTO `leave_requests` (student_id, session_id, reason, status)
+VALUES (242, 55, 'Tôi bận đi chơi.', 'rejected');
+```
+
+### Bước 7: Cập nhật engagement_scores thực tế
+
+```sql
+-- Course 25: Điểm tốt (đi học đầy đủ, tương tác nhiều)
+-- Có mặt 3 buổi × 2đ = 6, Muộn 1 × 1đ = 1, Vắng có phép = 0 → attendance_points = 7
+-- Tương tác: 1+2+1+1+2 = 7 interaction_points
+UPDATE `engagement_scores` 
+SET attendance_points = 7, interaction_points = 7, total_score = 70
+WHERE course_id = 25 AND student_id = 242;
+
+-- Course 27: Điểm kém (vắng 4 buổi, không tương tác)
+-- Vắng 4 × 0đ = 0 attendance_points, interaction = 0
+-- CPI = 0 → kích hoạt alert
+UPDATE `engagement_scores` 
+SET attendance_points = 0, interaction_points = 0, total_score = 10
+WHERE course_id = 27 AND student_id = 242;
+
+-- Course 30: Điểm trung bình
+-- Present 2×2=4, Late 3×1=3, Absent 1×0=0 → 7, Tương tác: 1
+UPDATE `engagement_scores` 
+SET attendance_points = 7, interaction_points = 1, total_score = 45
+WHERE course_id = 30 AND student_id = 242;
+```
+
+### Bước 8: Tạo Active Session để test điểm danh
+
+```sql
+-- Tạo 1 buổi học đang active cho course 25 (student1 chưa điểm danh)
+UPDATE `class_sessions` 
+SET status = 'active', 
+    attendance_code = '123456', 
+    attendance_expires_at = DATE_ADD(NOW(), INTERVAL 30 MINUTE)
+WHERE course_id = 25 AND id = 56;
+```
+
+---
+
+## Kết quả Kỳ vọng Sau Khi Import
+
+| Test Case | Kiểm tra | Kỳ vọng |
+|---|---|---|
+| TC-01 | Dashboard student1 | 3 môn học, stats: Có mặt 7, Muộn 4, Vắng 5 |
+| TC-02 | CPI gauge môn 25 | ~70% (màu xanh) |
+| TC-03 | CPI gauge môn 27 | ~10% (màu đỏ) |
+| TC-04 | CPI gauge môn 30 | ~45% (màu vàng cam) |
+| TC-05 | Banner cảnh báo | 2 banner đỏ xuất hiện (vắng nhiều + CPI thấp) |
+| TC-06 | Lịch sử điểm danh | Bảng có dữ liệu present/late/absent/excused |
+| TC-07 | Quiz history | 2 bài: 8.5/10 và 4.0/10 |
+| TC-08 | Active session box | Hộp nhập code xuất hiện (code: 123456) |
+| TC-09 | Nhập code 123456 | Toast thành công, hộp ẩn |
+| TC-10 | Nhập code sai | Toast lỗi |
+| TC-11 | Leave request list | 3 đơn: 1 approved, 1 pending, 1 rejected |
+| TC-12 | Trang /student/schedule | Lịch 7 ngày tới hiển thị |
+| TC-13 | Trang /student/my-courses | 3 môn với CPI khác nhau |
+| TC-14 | Nút Hỏi/Trả lời | Log thêm interaction, CPI tăng |
+
+---
+
+## Cách Import Dữ liệu
+
+1. Mở **phpMyAdmin**: http://localhost/phpmyadmin
+2. Chọn database `attendance_system`
+3. Vào tab **SQL**
+4. Copy và chạy từng bước SQL ở trên theo thứ tự 1 → 8
+
+> [!IMPORTANT]
+> **Chạy theo thứ tự!** Bước 4 (quiz_submissions) phụ thuộc bước 4 tạo quiz_sessions trước.
+> Bước 6 (leave_requests) cần bảng đã tồn tại (Bước 1).
+
+> [!NOTE]
+> Sau khi import xong, truy cập: `http://localhost/Group-2_Final_Student/public/login`
+> Đăng nhập: `student1 / 123456` để kiểm tra.

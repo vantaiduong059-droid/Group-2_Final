@@ -105,12 +105,11 @@ class StudentApiController extends Controller {
         $courses = $stmtCourses->fetchAll();
 
         // 2. Điểm chuyên cần và CPI tổng hợp cho từng lớp học
+        // NOTE: Không auto-recalculate khi load dashboard để tránh ghi đè dữ liệu thực
+        // CPI chỉ được tính lại khi có sự kiện: điểm danh, tương tác, đóng buổi học
         $courseIds = array_column($courses, 'id');
         $scores = [];
         if (!empty($courseIds)) {
-            foreach ($courseIds as $cId) {
-                $this->engagementRepo->recalculateScore($cId, $studentId);
-            }
             $placeholders = implode(',', array_fill(0, count($courseIds), '?'));
             $stmtScores = $db->prepare("
                 SELECT * FROM engagement_scores 
@@ -251,5 +250,104 @@ class StudentApiController extends Controller {
                 'myLeaveRequests'   => $myLeaveRequests,
             ]
         ]);
+    }
+
+    /**
+     * Sinh viên tự log tương tác khi đang có active session
+     * POST /api/student/interaction
+     */
+    public function studentInteraction() {
+        if ($_SESSION['user']['role'] !== 'student') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Chức năng dành cho Sinh viên.'], 403);
+            return;
+        }
+
+        $data = $this->getJsonInput();
+        $sessionId = $data['session_id'] ?? null;
+        $type = $data['type'] ?? 'question'; // question | answer | discussion
+        $studentId = $_SESSION['user']['id'];
+
+        if (!$sessionId || !in_array($type, ['question', 'answer', 'discussion'])) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Dữ liệu không hợp lệ.'], 400);
+            return;
+        }
+
+        $db = Database::getInstance()->getConnection();
+
+        // Kiểm tra buổi học có đang active và sinh viên có trong lớp không
+        $stmtSess = $db->prepare("
+            SELECT cs.id, cs.course_id FROM class_sessions cs
+            JOIN course_students cstud ON cs.course_id = cstud.course_id
+            WHERE cs.id = ? AND cs.status = 'active' AND cstud.student_id = ?
+        ");
+        $stmtSess->execute([$sessionId, $studentId]);
+        $sess = $stmtSess->fetch();
+
+        if (!$sess) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Không có buổi học đang diễn ra hoặc bạn không đăng ký lớp này.'], 400);
+            return;
+        }
+
+        // Điểm theo loại tương tác
+        $pointsMap = ['question' => 1, 'answer' => 2, 'discussion' => 1];
+        $points = $pointsMap[$type];
+
+        try {
+            require_once '../app/Repositories/InteractionRepository.php';
+            require_once '../app/Models/Interaction.php';
+            $interactionRepo = new InteractionRepository(new Interaction());
+            $interactionRepo->addLog($sessionId, $studentId, $type, $points);
+
+            // Tính lại CPI ngay
+            $this->engagementRepo->recalculateScore($sess['course_id'], $studentId);
+
+            $typeLabel = ['question' => 'đặt câu hỏi', 'answer' => 'trả lời', 'discussion' => 'thảo luận'][$type];
+            $this->jsonResponse(['status' => 'success', 'message' => "Đã ghi nhận bạn $typeLabel. +{$points} điểm tương tác!", 'points' => $points]);
+        } catch (Exception $e) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Lỗi ghi nhận tương tác: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Sinh viên đổi mật khẩu
+     * POST /api/student/change-password
+     */
+    public function changePassword() {
+        if (!isset($_SESSION['user'])) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Unauthorized'], 401);
+            return;
+        }
+
+        $data = $this->getJsonInput();
+        $currentPw = $data['current_password'] ?? '';
+        $newPw = $data['new_password'] ?? '';
+
+        if (empty($currentPw) || empty($newPw)) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng nhập đầy đủ mật khẩu hiện tại và mật khẩu mới.'], 400);
+            return;
+        }
+        if (strlen($newPw) < 6) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Mật khẩu mới phải có ít nhất 6 ký tự.'], 400);
+            return;
+        }
+
+        $userId = $_SESSION['user']['id'];
+        $db = Database::getInstance()->getConnection();
+
+        // Lấy hash hiện tại từ DB
+        $stmt = $db->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+
+        if (!$user || !password_verify($currentPw, $user['password'])) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Mật khẩu hiện tại không đúng.'], 400);
+            return;
+        }
+
+        $newHash = password_hash($newPw, PASSWORD_DEFAULT);
+        $stmtUp = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+        $stmtUp->execute([$newHash, $userId]);
+
+        $this->jsonResponse(['status' => 'success', 'message' => 'Đổi mật khẩu thành công!']);
     }
 }
