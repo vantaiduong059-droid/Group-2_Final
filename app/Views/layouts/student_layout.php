@@ -2,15 +2,77 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title><?= isset($title) ? htmlspecialchars($title) : 'Sinh viên' ?> - EduManager</title>
     <meta name="description" content="Cổng sinh viên EduManager - Theo dõi chuyên cần và tương tác lớp học">
+
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="EduManager">
+    <meta name="theme-color" content="#3b82f6">
+    <meta name="msapplication-TileColor" content="#3b82f6">
+
+    <!-- PWA Manifest & Icons -->
+    <link rel="manifest" href="<?= BASE_URL ?>/manifest.json">
+    <link rel="apple-touch-icon" href="<?= BASE_URL ?>/assets/images/icon-192.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="<?= BASE_URL ?>/assets/images/icon-192.png">
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=<?= time() ?>">
+
+    <style>
+    /* Mobile Bottom Navigation */
+    #mobileBottomNav {
+        display: none;
+        position: fixed;
+        bottom: 0; left: 0; right: 0;
+        background: #fff;
+        border-top: 1px solid #e5e7eb;
+        z-index: 1050;
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
+    }
+    #mobileBottomNav a {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 10px 4px 8px;
+        text-decoration: none;
+        color: #6b7280;
+        font-size: 0.65rem;
+        font-weight: 500;
+        transition: color 0.2s;
+    }
+    #mobileBottomNav a.active, #mobileBottomNav a:hover { color: #3b82f6; }
+    #mobileBottomNav a i { font-size: 1.4rem; margin-bottom: 2px; }
+    /* Install banner */
+    #pwaInstallBanner {
+        display: none;
+        position: fixed;
+        bottom: 70px; left: 12px; right: 12px;
+        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        color: #fff;
+        border-radius: 14px;
+        padding: 14px 18px;
+        z-index: 1060;
+        box-shadow: 0 8px 24px rgba(59,130,246,0.4);
+        align-items: center;
+        gap: 12px;
+    }
+    @media (max-width: 767.98px) {
+        #mobileBottomNav { display: flex !important; }
+        #page-content-wrapper { padding-bottom: 70px !important; }
+        #sidebar-wrapper { display: none !important; }
+        #wrapper { display: block !important; }
+    }
+    </style>
 </head>
 <body>
 
@@ -185,5 +247,76 @@
 </script>
 <script src="<?= BASE_URL ?>/assets/js/main.js"></script>
 <?php if (isset($extraJs)) echo $extraJs; ?>
+
+<!-- Mobile Bottom Navigation -->
+<nav id="mobileBottomNav">
+    <?php
+    $currentPath = $_SERVER['REQUEST_URI'] ?? '';
+    $navItems = [
+        ['url' => BASE_URL.'/student/dashboard', 'icon' => 'bi-person-badge', 'label' => 'Tương tác', 'match' => '/student/dashboard'],
+        ['url' => BASE_URL.'/student/schedule',  'icon' => 'bi-calendar-week','label' => 'Lịch học',   'match' => '/student/schedule'],
+        ['url' => BASE_URL.'/student/my-courses','icon' => 'bi-journal-bookmark','label' => 'Học phần', 'match' => '/student/my-courses'],
+        ['url' => BASE_URL.'/student/profile',   'icon' => 'bi-person-circle', 'label' => 'Hồ sơ',    'match' => '/student/profile'],
+    ];
+    foreach ($navItems as $nav):
+        $active = strpos($currentPath, $nav['match']) !== false ? 'active' : '';
+    ?>
+    <a href="<?= $nav['url'] ?>" class="<?= $active ?>">
+        <i class="bi <?= $nav['icon'] ?>"></i>
+        <?= $nav['label'] ?>
+    </a>
+    <?php endforeach; ?>
+</nav>
+
+<!-- PWA Install Banner -->
+<div id="pwaInstallBanner">
+    <img src="<?= BASE_URL ?>/assets/images/icon-192.png" alt="" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;">
+    <div style="flex:1;">
+        <div style="font-size:0.9rem;font-weight:700;">Cài EduManager lên điện thoại</div>
+        <div style="font-size:0.75rem;opacity:0.85;">Theo dõi lịch học mọi lúc mọi nơi</div>
+    </div>
+    <button id="btnInstallPwa" style="background:#fff;color:#3b82f6;border:none;border-radius:20px;padding:6px 14px;font-size:0.8rem;font-weight:700;cursor:pointer;flex-shrink:0;">Cài</button>
+    <button onclick="document.getElementById('pwaInstallBanner').style.display='none'" style="background:transparent;border:none;color:#fff;font-size:1.1rem;cursor:pointer;flex-shrink:0;">×</button>
+</div>
+
+<script>
+// Service Worker Registration
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('<?= BASE_URL ?>/sw.js')
+            .then(reg => console.log('[PWA] SW registered:', reg.scope))
+            .catch(err => console.warn('[PWA] SW registration failed:', err));
+    });
+}
+
+// PWA Install Prompt
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'flex';
+});
+
+const btnInstall = document.getElementById('btnInstallPwa');
+if (btnInstall) {
+    btnInstall.addEventListener('click', async () => {
+        if (!deferredPrompt) return;
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+        document.getElementById('pwaInstallBanner').style.display = 'none';
+        if (outcome === 'accepted') {
+            console.log('[PWA] App installed!');
+        }
+    });
+}
+
+window.addEventListener('appinstalled', () => {
+    const banner = document.getElementById('pwaInstallBanner');
+    if (banner) banner.style.display = 'none';
+    console.log('[PWA] App installed successfully!');
+});
+</script>
 </body>
 </html>

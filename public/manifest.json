@@ -1,0 +1,49 @@
+{
+  "name": "EduManager - Sinh viên",
+  "short_name": "EduManager",
+  "description": "Theo dõi chuyên cần, lịch học và điểm CPI của sinh viên",
+  "start_url": "/Group-2_Final_Student/public/student/dashboard",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#3b82f6",
+  "orientation": "portrait-primary",
+  "lang": "vi",
+  "categories": ["education", "productivity"],
+  "icons": [
+    {
+      "src": "/Group-2_Final_Student/public/assets/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/Group-2_Final_Student/public/assets/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Lịch học",
+      "short_name": "Lịch học",
+      "description": "Xem lịch học sắp tới",
+      "url": "/Group-2_Final_Student/public/student/schedule",
+      "icons": [{ "src": "/Group-2_Final_Student/public/assets/images/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Điểm danh",
+      "short_name": "Điểm danh",
+      "description": "Điểm danh buổi học đang diễn ra",
+      "url": "/Group-2_Final_Student/public/student/dashboard",
+      "icons": [{ "src": "/Group-2_Final_Student/public/assets/images/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Học phần",
+      "short_name": "Học phần",
+      "description": "Xem điểm CPI các học phần",
+      "url": "/Group-2_Final_Student/public/student/my-courses",
+      "icons": [{ "src": "/Group-2_Final_Student/public/assets/images/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
