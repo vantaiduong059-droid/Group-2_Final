@@ -24,8 +24,12 @@ class TeacherApiController extends Controller {
     public function store() {
         $data = $this->getJsonInput();
         
-        if (empty($data['username']) || empty($data['full_name']) || empty($data['email'])) {
+        if (empty($data['username']) || empty($data['last_name']) || empty($data['first_name']) || empty($data['email'])) {
             $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng nhập đầy đủ thông tin bắt buộc'], 400);
+        }
+
+        if (!preg_match('/^[\p{L} ]+$/u', $data['last_name']) || !preg_match('/^[\p{L} ]+$/u', $data['first_name'])) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Họ tên chỉ được chứa chữ cái và khoảng trắng'], 400);
         }
 
         try {
@@ -39,8 +43,12 @@ class TeacherApiController extends Controller {
     public function update($id) {
         $data = $this->getJsonInput();
         
-        if (empty($data['username']) || empty($data['full_name']) || empty($data['email'])) {
+        if (empty($data['username']) || empty($data['last_name']) || empty($data['first_name']) || empty($data['email'])) {
             $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng nhập đầy đủ thông tin bắt buộc'], 400);
+        }
+
+        if (!preg_match('/^[\p{L} ]+$/u', $data['last_name']) || !preg_match('/^[\p{L} ]+$/u', $data['first_name'])) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Họ tên chỉ được chứa chữ cái và khoảng trắng'], 400);
         }
 
         try {
