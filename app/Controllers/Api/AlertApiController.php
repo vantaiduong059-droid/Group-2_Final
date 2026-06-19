@@ -8,7 +8,7 @@ class AlertApiController extends Controller {
     private $alertRepo;
 
     public function __construct() {
-        if (!isset($_SESSION['user'])) {
+        if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'admin') {
             $this->jsonResponse(['status' => 'error', 'message' => 'Unauthorized'], 403);
             exit;
         }
@@ -17,32 +17,28 @@ class AlertApiController extends Controller {
     }
 
     public function index() {
-        if ($_SESSION['user']['role'] !== 'admin') {
-            $this->jsonResponse(['status' => 'error', 'message' => 'Forbidden'], 403);
-            return;
-        }
         $alerts = $this->alertRepo->getAllAlerts();
         $this->jsonResponse(['status' => 'success', 'data' => $alerts]);
     }
 
     public function update($id) {
         try {
-            $alert = $this->alertRepo->getById($id);
-            if (!$alert) {
-                $this->jsonResponse(['status' => 'error', 'message' => 'Cảnh báo không tồn tại'], 404);
-                return;
-            }
-
-            // Chỉ cho phép admin hoặc chính học sinh sở hữu cảnh báo cập nhật trạng thái đã đọc
-            if ($_SESSION['user']['role'] !== 'admin' && $alert['user_id'] != $_SESSION['user']['id']) {
-                $this->jsonResponse(['status' => 'error', 'message' => 'Forbidden'], 403);
-                return;
-            }
-
             $this->alertRepo->markAsRead($id);
             $this->jsonResponse(['status' => 'success', 'message' => 'Đã đánh dấu là đã đọc']);
         } catch (Exception $e) {
             $this->jsonResponse(['status' => 'error', 'message' => 'Lỗi cập nhật'], 500);
+        }
+    }
+
+    public function assignAdvisor($id) {
+        $data = $this->getJsonInput();
+        $advisorId = isset($data['advisor_id']) && $data['advisor_id'] !== '' ? (int)$data['advisor_id'] : null;
+
+        try {
+            $this->alertRepo->assignAdvisor($id, $advisorId);
+            $this->jsonResponse(['status' => 'success', 'message' => 'Đã gán cố vấn học tập thành công.']);
+        } catch (Exception $e) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Lỗi gán cố vấn: ' . $e->getMessage()], 500);
         }
     }
 }
