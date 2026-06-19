@@ -27,10 +27,17 @@ class AdminController extends Controller {
         $stmt = $db->query("SELECT COUNT(*) FROM users WHERE role = 'teacher'");
         $totalTeachers = $stmt->fetchColumn();
 
+        // Đếm số buổi học đã diễn ra thực tế trên toàn trường
+        $stmtPassed = $db->query("SELECT COUNT(*) FROM class_sessions WHERE CONCAT(session_date, ' ', end_time) < NOW()");
+        $passedSessionsCount = (int)$stmtPassed->fetchColumn();
+
         // 4. Tỷ lệ chuyên cần chung
-        $stmt = $db->query("SELECT COUNT(*) as total, SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count FROM attendance_records");
-        $attData = $stmt->fetch();
-        $attendanceRate = ($attData['total'] > 0) ? round(($attData['present_count'] / $attData['total']) * 100, 1) : 0;
+        $attendanceRate = null;
+        if ($passedSessionsCount > 0) {
+            $stmt = $db->query("SELECT COUNT(*) as total, SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present_count FROM attendance_records");
+            $attData = $stmt->fetch();
+            $attendanceRate = ($attData['total'] > 0) ? round(($attData['present_count'] / $attData['total']) * 100, 1) : 100.0;
+        }
 
         // 5. Thống kê điểm danh (Tròn)
         $stmt = $db->query("SELECT status, COUNT(*) as count FROM attendance_records GROUP BY status");
@@ -48,7 +55,7 @@ class AdminController extends Controller {
 
         // 7. Sự kiện/Buổi học sắp tới (Top 3)
         $stmt = $db->query("
-            SELECT s.session_date, s.start_time, c.name as course_name 
+            SELECT s.id, s.session_date, s.start_time, c.name as course_name 
             FROM class_sessions s 
             JOIN courses c ON s.course_id = c.id 
             WHERE s.session_date >= CURDATE() 
@@ -104,6 +111,7 @@ class AdminController extends Controller {
             'totalStudents' => $totalStudents,
             'totalTeachers' => $totalTeachers,
             'attendanceRate' => $attendanceRate,
+            'passedSessionsCount' => $passedSessionsCount,
             'attStats' => $attStats,
             'newStudents' => $newStudents,
             'upcomingEvents' => $upcomingEvents,
@@ -125,10 +133,21 @@ class AdminController extends Controller {
     }
 
     public function sessions() {
-        $this->view('admin/sessions', ['title' => 'Quản lý Buổi học']);
+        $this->view('admin/sessions', ['title' => 'Lịch học']);
+    }
+
+    public function sessionAttendance($id) {
+        $this->view('admin/session_attendance', [
+            'title' => 'Chi tiết điểm danh',
+            'sessionId' => $id
+        ]);
     }
 
     public function alerts() {
         $this->view('admin/alerts', ['title' => 'Hệ thống Cảnh báo']);
+    }
+
+    public function notifications() {
+        $this->view('admin/notifications', ['title' => 'Thông báo']);
     }
 }
