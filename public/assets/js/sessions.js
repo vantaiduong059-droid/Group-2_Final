@@ -3,6 +3,21 @@
 let currentDate = new Date(); // Ngày neo hiện tại để xác định tuần hiển thị
 let sessionsList = [];       // Danh sách buổi học từ CSDL
 let filterType = 'all';      // Bộ lọc: 'all', 'study', 'exam'
+let currentSessionId = null; // ID buổi học đang được sửa đổi
+
+// Bảng mapping tiết học -> giờ học cố định chuẩn của trường
+const PERIOD_TIME_MAP = {
+    1: { start: "07:00", end: "07:50" },
+    2: { start: "07:50", end: "08:40" },
+    3: { start: "09:00", end: "09:50" },
+    4: { start: "09:50", end: "10:40" },
+    5: { start: "10:40", end: "11:30" },
+    6: { start: "13:00", end: "13:50" },
+    7: { start: "13:50", end: "14:40" },
+    8: { start: "15:00", end: "15:50" },
+    9: { start: "15:50", end: "16:40" },
+    10: { start: "16:40", end: "17:30" }
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     // 1. Khởi tạo ngày mặc định trên Datepicker là hôm nay (theo múi giờ Việt Nam)
@@ -25,10 +40,127 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // 3. Load danh sách buổi học và khóa học dropdown
+    // 3. Đăng ký các sự kiện tự động tính giờ và check trùng sớm trên modal
+    const periodInput = document.getElementById('sessionPeriod');
+    if (periodInput) {
+        periodInput.addEventListener('input', updateTimesFromPeriod);
+    }
+
+    const triggerFields = ['sessionDate', 'sessionStartTime', 'sessionEndTime', 'sessionRoom'];
+    triggerFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener('change', checkConflictEarly);
+            el.addEventListener('input', checkConflictEarly);
+        }
+    });
+
+    // Khởi tạo Flatpickr cho giờ bắt đầu và kết thúc (24h)
+    if (typeof flatpickr !== 'undefined') {
+        flatpickr("#sessionStartTime", {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: "H:i",
+            time_24hr: true,
+            allowInput: true,
+            minuteIncrement: 5, // step 5 phút cho mũi tên tăng/giảm gọn gàng
+            static: true,       // Gán popup ngay dưới input để không bị lệch/tràn khỏi modal
+            onChange: function() {
+                checkConflictEarly();
+            }
+        });
+        flatpickr("#sessionEndTime", {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: "H:i",
+            time_24hr: true,
+            allowInput: true,
+            minuteIncrement: 5, // step 5 phút cho mũi tên tăng/giảm gọn gàng
+            static: true,       // Gán popup ngay dưới input để không bị lệch/tràn khỏi modal
+            onChange: function() {
+                checkConflictEarly();
+            }
+        });
+
+        // Bật tính năng cuộn chuột trên ô input (mỗi nấc cuộn tăng/giảm 5 phút)
+        enableWheelOnTimeInput('sessionStartTime');
+        enableWheelOnTimeInput('sessionEndTime');
+
+        // Bật tự động nhận diện gõ số nhanh khi rời khỏi input (ví dụ: 0900 -> 09:00)
+        enableAutoTimeFormat('sessionStartTime');
+        enableAutoTimeFormat('sessionEndTime');
+    }
+
+    // 4. Load danh sách buổi học và khóa học dropdown
     loadSessions();
     loadCoursesDropdown();
 });
+
+// Tự động cập nhật giờ bắt đầu/kết thúc dựa trên Tiết học
+function updateTimesFromPeriod() {
+    const periodVal = document.getElementById('sessionPeriod').value.trim();
+    if (!periodVal) return;
+    
+    const matches = periodVal.match(/\d+/g);
+    if (matches && matches.length > 0) {
+        const startPeriod = parseInt(matches[0]);
+        const endPeriod = parseInt(matches[matches.length - 1]);
+        
+        if (PERIOD_TIME_MAP[startPeriod] && PERIOD_TIME_MAP[endPeriod]) {
+            const startTime = PERIOD_TIME_MAP[startPeriod].start;
+            const endTime = PERIOD_TIME_MAP[endPeriod].end;
+            
+            setTimePickerValue('sessionStartTime', startTime);
+            setTimePickerValue('sessionEndTime', endTime);
+            
+            // Kích hoạt check trùng ca học sớm
+            checkConflictEarly();
+        }
+    }
+}
+
+// Cảnh báo sớm trùng phòng + giờ + ngày học
+function checkConflictEarly() {
+    const date = document.getElementById('sessionDate').value;
+    const start = document.getElementById('sessionStartTime').value;
+    const end = document.getElementById('sessionEndTime').value;
+    const room = document.getElementById('sessionRoom').value.trim();
+    const alertBox = document.getElementById('conflictAlert');
+    
+    if (!alertBox) return;
+    
+    if (!date || !start || !end || !room) {
+        alertBox.classList.add('d-none');
+        alertBox.innerHTML = '';
+        return;
+    }
+    
+    if (start >= end) {
+        alertBox.classList.remove('d-none');
+        alertBox.innerHTML = '<i class="bi bi-exclamation-octagon-fill me-2"></i>Giờ kết thúc phải lớn hơn giờ bắt đầu.';
+        return;
+    }
+    
+    let url = `${BASE_URL}/api/sessions/check-conflict?date=${date}&start=${start}&end=${end}&room=${encodeURIComponent(room)}`;
+    if (currentSessionId) {
+        url += `&exclude_id=${currentSessionId}`;
+    }
+    
+    fetch(url)
+        .then(res => res.json())
+        .then(res => {
+            if (res.status === 'conflict') {
+                alertBox.classList.remove('d-none');
+                alertBox.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i>${res.message}`;
+            } else {
+                alertBox.classList.add('d-none');
+                alertBox.innerHTML = '';
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi kiểm tra trùng lịch sớm:', err);
+        });
+}
 
 // Lấy danh sách buổi học từ API
 function loadSessions() {
@@ -156,6 +288,16 @@ function renderWeeklySchedule() {
                 const card = document.createElement('div');
                 card.className = `session-item-card ${cardClass}`;
                 
+                // Xác định hình thức điểm danh hiện tại của buổi học
+                let methodText = '<span class="text-muted">Chưa mở</span>';
+                if (s.attendance_code) {
+                    methodText = `<span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5">Mã Code: ${s.attendance_code}</span>`;
+                } else if (s.qr_token) {
+                    methodText = `<span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-0.5">Quét QR</span>`;
+                } else if (s.status === 'completed') {
+                    methodText = `<span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5">Hoàn thành</span>`;
+                }
+
                 // Tạo nội dung HTML
                 let noteHtml = s.note ? `<div class="session-note-box text-truncate" title="${s.note}"><i class="bi bi-info-circle me-1"></i>Ghi chú: ${s.note}</div>` : '';
                 
@@ -174,16 +316,22 @@ function renderWeeklySchedule() {
                         <i class="bi bi-geo-alt"></i><span class="text-truncate" title="${s.room || 'Phòng học 102'}">${s.room || 'Phòng học 102'}</span>
                     </div>
                     <div class="session-meta-line">
-                        <i class="bi bi-person-badge"></i><span>GV: ${s.teacher_name || 'Chưa phân công'}</span>
+                        <i class="bi bi-person-badge"></i><span>GV: ${s.teacher_name || 'Chưa phân công'} (${s.teacher_email || 'N/A'})</span>
+                    </div>
+                    <div class="session-meta-line mt-1.5">
+                        <i class="bi bi-check2-square"></i><span>Điểm danh: ${methodText}</span>
                     </div>
                     ${noteHtml}
                     
                     <!-- Nút thao tác nhanh dành cho Admin -->
                     <div class="session-card-actions">
-                        <button class="btn-card-action edit" onclick="event.stopPropagation(); handleEditClick(${JSON.stringify(s).replace(/"/g, '&quot;')})">
+                        <a class="btn-card-action attendance text-decoration-none" href="${BASE_URL}/admin/sessions/${s.id}/attendance" onclick="event.stopPropagation();" title="Điểm danh">
+                            <i class="bi bi-calendar-check text-success"></i>
+                        </a>
+                        <button class="btn-card-action edit" title="Sửa">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn-card-action delete" onclick="event.stopPropagation(); deleteSession(${s.id})">
+                        <button class="btn-card-action delete" title="Xóa">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
@@ -193,6 +341,23 @@ function renderWeeklySchedule() {
                 card.addEventListener('click', () => {
                     handleEditClick(s);
                 });
+
+                // Đăng ký sự kiện click cho các nút hành động của card để tránh lỗi cú pháp JSON
+                const btnEdit = card.querySelector('.btn-card-action.edit');
+                if (btnEdit) {
+                    btnEdit.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        handleEditClick(s);
+                    });
+                }
+
+                const btnDelete = card.querySelector('.btn-card-action.delete');
+                if (btnDelete) {
+                    btnDelete.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        deleteSession(s.id);
+                    });
+                }
 
                 targetCell.appendChild(card);
             }
@@ -262,10 +427,22 @@ function openSessionModal() {
     document.getElementById('sessionModalTitle').innerText = 'Tạo buổi học mới';
     document.getElementById('sessionForm').reset();
     
+    clearTimePicker('sessionStartTime');
+    clearTimePicker('sessionEndTime');
+
     // Gán ngày mặc định trong modal là ngày đang chọn trên lịch
     document.getElementById('sessionDate').value = formatDateToYYYYMMDD(currentDate);
     document.getElementById('sessionRoom').value = 'Phòng học 102, số 1 Phan Tây Nhạc';
     document.getElementById('sessionPeriod').value = '1 - 3';
+    
+    // Tự động tính giờ bắt đầu/kết thúc cho tiết mặc định
+    updateTimesFromPeriod();
+
+    const alertBox = document.getElementById('conflictAlert');
+    if (alertBox) {
+        alertBox.classList.add('d-none');
+        alertBox.innerHTML = '';
+    }
 
     const modal = new bootstrap.Modal(document.getElementById('sessionModal'));
     modal.show();
@@ -278,12 +455,18 @@ function handleEditClick(s) {
     
     document.getElementById('sessionCourseId').value = s.course_id;
     document.getElementById('sessionDate').value = s.session_date;
-    document.getElementById('sessionStartTime').value = s.start_time;
-    document.getElementById('sessionEndTime').value = s.end_time;
+    setTimePickerValue('sessionStartTime', s.start_time);
+    setTimePickerValue('sessionEndTime', s.end_time);
     document.getElementById('sessionRoom').value = s.room || '';
     document.getElementById('sessionPeriod').value = s.period || '';
     document.getElementById('sessionNote').value = s.note || '';
     document.getElementById('sessionStatus').value = s.status;
+
+    const alertBox = document.getElementById('conflictAlert');
+    if (alertBox) {
+        alertBox.classList.add('d-none');
+        alertBox.innerHTML = '';
+    }
     
     const modal = new bootstrap.Modal(document.getElementById('sessionModal'));
     modal.show();
@@ -296,14 +479,26 @@ function saveSession() {
         session_date: document.getElementById('sessionDate').value,
         start_time: document.getElementById('sessionStartTime').value,
         end_time: document.getElementById('sessionEndTime').value,
-        room: document.getElementById('sessionRoom').value,
-        period: document.getElementById('sessionPeriod').value,
-        note: document.getElementById('sessionNote').value,
+        room: document.getElementById('sessionRoom').value.trim(),
+        period: document.getElementById('sessionPeriod').value.trim(),
+        note: document.getElementById('sessionNote').value.trim(),
         status: document.getElementById('sessionStatus').value
     };
 
     if(!data.course_id || !data.session_date || !data.start_time || !data.end_time || !data.room || !data.period) {
         showToast('Vui lòng điền đủ các thông tin bắt buộc', 'warning');
+        return;
+    }
+
+    if(data.start_time >= data.end_time) {
+        showToast('Giờ kết thúc phải lớn hơn giờ bắt đầu', 'warning');
+        return;
+    }
+
+    // Kiểm tra nếu đang có thông báo trùng lịch hiển thị thì ngăn cản submit
+    const alertBox = document.getElementById('conflictAlert');
+    if (alertBox && !alertBox.classList.contains('d-none') && alertBox.innerText.includes('đã có buổi học')) {
+        showToast('Không thể lưu do bị trùng lịch học. Vui lòng chọn phòng hoặc giờ khác!', 'danger');
         return;
     }
 
@@ -330,6 +525,11 @@ function saveSession() {
             loadSessions();
         } else {
             showToast(res.message, 'danger');
+            // Nếu lưu thất bại do backend trả về lỗi trùng lịch, hiển thị lên alertBox
+            if (alertBox && res.message) {
+                alertBox.classList.remove('d-none');
+                alertBox.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i>${res.message}`;
+            }
         }
     })
     .catch(err => {
@@ -402,4 +602,99 @@ function toggleFullscreenSchedule() {
         btn.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
         showToast('Đã mở lịch học toàn màn hình', 'success');
     }
+}
+
+// Hàm helper để gán giá trị thời gian cho Flatpickr
+function setTimePickerValue(id, val) {
+    const el = document.getElementById(id);
+    if (el && el._flatpickr) {
+        el._flatpickr.setDate(val);
+    } else if (el) {
+        el.value = val;
+    }
+}
+
+// Hàm helper để xóa giá trị thời gian cho Flatpickr
+function clearTimePicker(id) {
+    const el = document.getElementById(id);
+    if (el && el._flatpickr) {
+        el._flatpickr.clear();
+    } else if (el) {
+        el.value = '';
+    }
+}
+
+// Cho phép lăn chuột trực tiếp trên input để thay đổi thời gian (nửa trái đổi giờ, nửa phải đổi phút)
+function enableWheelOnTimeInput(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    
+    el.addEventListener('wheel', function(e) {
+        if (!el._flatpickr) return;
+        e.preventDefault();
+        
+        const direction = e.deltaY < 0 ? 1 : -1;
+        const selectedDates = el._flatpickr.selectedDates;
+        let currentDate = selectedDates[0];
+        
+        // Nếu chưa chọn ngày/giờ nào, khởi tạo theo giờ mặc định của input hoặc giờ hiện tại
+        if (!currentDate) {
+            const val = el.value || "07:00";
+            const parts = val.split(':');
+            currentDate = new Date();
+            currentDate.setHours(parseInt(parts[0]) || 0);
+            currentDate.setMinutes(parseInt(parts[1]) || 0);
+        }
+        
+        const rect = el.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const isHour = mouseX < (rect.width / 2);
+        
+        if (isHour) {
+            const nextHours = (currentDate.getHours() + direction + 24) % 24;
+            currentDate.setHours(nextHours);
+        } else {
+            // Cuộn tăng/giảm theo step 5 phút cho hợp lý
+            let currentMinutes = currentDate.getMinutes();
+            // Làm tròn về bội số của 5 trước khi tăng/giảm để tránh số lẻ khi lăn
+            currentMinutes = Math.round(currentMinutes / 5) * 5;
+            const nextMinutes = (currentMinutes + direction * 5 + 60) % 60;
+            currentDate.setMinutes(nextMinutes);
+        }
+        
+        // Cập nhật giá trị vào flatpickr và kích hoạt sự kiện thay đổi
+        el._flatpickr.setDate(currentDate, true);
+    });
+}
+
+// Tự động nhận diện định dạng giờ nhanh khi người dùng gõ tay (ví dụ: "0900" -> "09:00", "900" -> "09:00")
+function enableAutoTimeFormat(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    
+    el.addEventListener('blur', function() {
+        let val = el.value.trim().replace(/\D/g, ''); // Lấy mọi ký tự số
+        
+        if (val.length === 3) {
+            val = '0' + val.substring(0, 1) + ':' + val.substring(1, 3);
+        } else if (val.length === 4) {
+            val = val.substring(0, 2) + ':' + val.substring(2, 4);
+        }
+        
+        // Kiểm tra tính hợp lệ của HH:MM
+        if (val.length === 5 && val.includes(':')) {
+            const parts = val.split(':');
+            const h = parseInt(parts[0]);
+            const m = parseInt(parts[1]);
+            
+            if (h >= 0 && h < 24 && m >= 0 && m < 60) {
+                if (el._flatpickr) {
+                    el._flatpickr.setDate(val, true); // Gán cho flatpickr và kích hoạt sự kiện change
+                } else {
+                    el.value = val;
+                    checkConflictEarly();
+                }
+            }
+        }
+    });
 }
