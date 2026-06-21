@@ -1,10 +1,13 @@
 // public/assets/js/students.js
 
 let currentStudentId = null;
+let allStudentsList = [];
 let studentsList = [];
+let majorsList = [];
 let currentView = localStorage.getItem('studentView') || 'grid'; // Lưu trạng thái view
 
 document.addEventListener('DOMContentLoaded', () => {
+    loadMajors();
     loadStudents();
     
     // Đồng bộ nút view
@@ -34,25 +37,87 @@ function setStudentView(viewType) {
     renderStudents();
 }
 
+// Lấy danh sách Ngành học
+function loadMajors() {
+    fetch(`${BASE_URL}/api/majors`)
+        .then(response => response.json())
+        .then(res => {
+            if(res.status === 'success') {
+                majorsList = res.data;
+                populateMajorsDropdowns();
+            }
+        })
+        .catch(err => {
+            console.error('Lỗi khi tải danh sách ngành học:', err);
+        });
+}
+
+// Đổ dữ liệu ngành học vào các select box
+function populateMajorsDropdowns() {
+    const filterMajor = document.getElementById('filterMajor');
+    const studentMajor = document.getElementById('studentMajor');
+    
+    if (filterMajor) {
+        filterMajor.innerHTML = '<option value="">-- Tất cả các Ngành --</option>';
+        majorsList.forEach(m => {
+            filterMajor.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+        });
+    }
+    
+    if (studentMajor) {
+        studentMajor.innerHTML = '<option value="">-- Chọn ngành --</option>';
+        majorsList.forEach(m => {
+            studentMajor.innerHTML += `<option value="${m.id}">${m.name}</option>`;
+        });
+    }
+}
+
 // R - Lấy danh sách Học sinh
 function loadStudents() {
     fetch(`${BASE_URL}/api/students`)
         .then(response => response.json())
         .then(res => {
             if(res.status === 'success') {
-                studentsList = res.data;
-                renderStudents();
+                allStudentsList = res.data;
+                filterStudents();
             } else {
-                showToast('Không thể tải dữ liệu học sinh', 'danger');
+                showToast('Không thể tải dữ liệu sinh viên', 'danger');
             }
         })
         .catch(err => {
-            showToast('Lỗi khi tải dữ liệu học sinh.', 'danger');
+            showToast('Lỗi khi tải dữ liệu sinh viên.', 'danger');
             console.error(err);
         });
 }
 
-// Mảng màu pastel gradient cho avatar học sinh
+// Lọc động danh sách sinh viên theo tên/tài khoản, khóa, ngành
+function filterStudents() {
+    const searchVal = document.getElementById('searchName') ? document.getElementById('searchName').value.toLowerCase().trim() : '';
+    const cohortVal = document.getElementById('filterCohort') ? document.getElementById('filterCohort').value : '';
+    const majorVal = document.getElementById('filterMajor') ? document.getElementById('filterMajor').value : '';
+
+    studentsList = allStudentsList.filter(s => {
+        const matchesSearch = !searchVal || 
+            s.username.toLowerCase().includes(searchVal) || 
+            (s.full_name && s.full_name.toLowerCase().includes(searchVal));
+        const matchesCohort = !cohortVal || s.cohort === cohortVal;
+        const matchesMajor = !majorVal || String(s.major_id) === String(majorVal);
+        
+        return matchesSearch && matchesCohort && matchesMajor;
+    });
+
+    renderStudents();
+}
+
+// Reset các bộ lọc về mặc định
+function resetFilters() {
+    if (document.getElementById('searchName')) document.getElementById('searchName').value = '';
+    if (document.getElementById('filterCohort')) document.getElementById('filterCohort').value = '';
+    if (document.getElementById('filterMajor')) document.getElementById('filterMajor').value = '';
+    filterStudents();
+}
+
+// Mạng màu pastel gradient cho avatar học sinh
 const studentGradients = [
     'linear-gradient(135deg, #10b981, #059669)', // Xanh ngọc
     'linear-gradient(135deg, #3b82f6, #2563eb)', // Xanh da trời
@@ -75,7 +140,7 @@ function renderStudents() {
     container.innerHTML = '';
 
     if(studentsList.length === 0) {
-        container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-person-x fs-1 d-block mb-2"></i>Không có học sinh nào.</div>';
+        container.innerHTML = '<div class="text-center py-5 text-muted"><i class="bi bi-person-x fs-1 d-block mb-2"></i>Không có sinh viên nào phù hợp bộ lọc.</div>';
         return;
     }
 
@@ -112,6 +177,11 @@ function renderStudents() {
                     <h4 class="student-name" title="${s.full_name}">${s.full_name}</h4>
                     <span class="student-username-badge">@${s.username}</span>
                     
+                    <div class="mb-3 small">
+                        <span class="badge bg-light text-dark border me-1">${s.cohort || 'N/A'}</span>
+                        <span class="badge bg-light text-primary border" title="${s.major_name || 'N/A'}">${s.major_name || 'N/A'}</span>
+                    </div>
+
                     <div class="student-email">
                         <i class="bi bi-envelope-fill text-muted"></i>
                         <span class="text-truncate" style="max-width:180px;" title="${s.email}">${s.email}</span>
@@ -134,9 +204,11 @@ function renderStudents() {
                 <thead>
                     <tr>
                         <th class="ps-4 py-3" style="width: 60px;">STT</th>
-                        <th class="py-3">Họ và Tên học sinh</th>
-                        <th class="py-3" style="width: 160px;">Tài khoản đăng nhập</th>
-                        <th class="py-3">Địa chỉ Email học sinh</th>
+                        <th class="py-3">Họ và Tên sinh viên</th>
+                        <th class="py-3" style="width: 140px;">Tài khoản</th>
+                        <th class="py-3" style="width: 100px;">Khóa</th>
+                        <th class="py-3">Ngành học</th>
+                        <th class="py-3">Địa chỉ Email</th>
                         <th class="py-3 text-end pe-4" style="width: 120px;">Thao tác</th>
                     </tr>
                 </thead>
@@ -146,6 +218,8 @@ function renderStudents() {
                             <td class="ps-4 fw-medium text-muted">${index + 1}</td>
                             <td><span class="fw-bold text-dark">${s.full_name}</span></td>
                             <td><span class="badge bg-light text-dark border px-2.5 py-1.5 fw-bold">@${s.username}</span></td>
+                            <td><span class="fw-semibold text-secondary">${s.cohort || 'N/A'}</span></td>
+                            <td><span class="fw-semibold text-primary">${s.major_name || 'N/A'}</span></td>
                             <td class="text-secondary fw-semibold">${s.email}</td>
                             <td class="text-end pe-4">
                                 <button class="btn btn-sm btn-light text-primary me-1" onclick='openStudentEditModal(${JSON.stringify(s).replace(/"/g, '&quot;')})' title="Sửa">
@@ -168,8 +242,10 @@ function renderStudents() {
 // Mở modal tạo mới
 function openStudentModal() {
     currentStudentId = null;
-    document.getElementById('studentModalTitle').innerText = 'Thêm học sinh mới';
+    document.getElementById('studentModalTitle').innerText = 'Thêm sinh viên mới';
     document.getElementById('studentForm').reset();
+    document.getElementById('studentCohort').value = '';
+    document.getElementById('studentMajor').value = '';
     const modal = new bootstrap.Modal(document.getElementById('studentModal'));
     modal.show();
 }
@@ -177,10 +253,13 @@ function openStudentModal() {
 // Mở modal chỉnh sửa
 function openStudentEditModal(student) {
     currentStudentId = student.id;
-    document.getElementById('studentModalTitle').innerText = 'Chỉnh sửa học sinh';
-    document.getElementById('studentName').value = student.full_name;
+    document.getElementById('studentModalTitle').innerText = 'Chỉnh sửa sinh viên';
+    document.getElementById('studentLastName').value = student.last_name || '';
+    document.getElementById('studentFirstName').value = student.first_name || '';
     document.getElementById('studentUsername').value = student.username;
     document.getElementById('studentEmail').value = student.email;
+    document.getElementById('studentCohort').value = student.cohort || '';
+    document.getElementById('studentMajor').value = student.major_id || '';
     
     const modal = new bootstrap.Modal(document.getElementById('studentModal'));
     modal.show();
@@ -189,13 +268,22 @@ function openStudentEditModal(student) {
 // C/U - Lưu học sinh
 function saveStudent() {
     const data = {
-        full_name: document.getElementById('studentName').value.trim(),
+        last_name: document.getElementById('studentLastName').value.trim(),
+        first_name: document.getElementById('studentFirstName').value.trim(),
         username: document.getElementById('studentUsername').value.trim(),
-        email: document.getElementById('studentEmail').value.trim()
+        email: document.getElementById('studentEmail').value.trim(),
+        cohort: document.getElementById('studentCohort').value,
+        major_id: document.getElementById('studentMajor').value
     };
 
-    if(!data.full_name || !data.username || !data.email) {
-        showToast('Vui lòng điền đủ thông tin', 'warning');
+    if(!data.last_name || !data.first_name || !data.username || !data.email || !data.cohort || !data.major_id) {
+        showToast('Vui lòng điền đủ thông tin, bao gồm cả Khóa và Ngành học', 'warning');
+        return;
+    }
+
+    const nameRegex = /^[\p{L}\s]+$/u;
+    if(!nameRegex.test(data.last_name) || !nameRegex.test(data.first_name)) {
+        showToast('Họ tên chỉ được chứa chữ cái và khoảng trắng', 'warning');
         return;
     }
 
@@ -227,7 +315,7 @@ function saveStudent() {
 
 // D - Xóa học sinh
 function deleteStudent(id) {
-    if(confirm('Bạn có chắc chắn muốn xóa học sinh này? Mọi thông tin chuyên cần, điểm danh và tương tác sẽ bị xóa vĩnh viễn!')) {
+    if(confirm('Bạn có chắc chắn muốn xóa sinh viên này? Mọi thông tin chuyên cần, điểm danh và tương tác sẽ bị xóa vĩnh viễn!')) {
         fetch(`${BASE_URL}/api/students/${id}`, {
             method: 'DELETE'
         })
@@ -245,3 +333,4 @@ function deleteStudent(id) {
         });
     }
 }
+
