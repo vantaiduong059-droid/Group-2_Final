@@ -42,6 +42,17 @@ function loadCourses() {
         .then(res => {
             if(res.status === 'success') {
                 coursesList = res.data;
+                
+                // Tự động lọc nếu có từ khóa search trên URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const searchKeyword = urlParams.get('search');
+                if (searchKeyword) {
+                    coursesList = coursesList.filter(c => 
+                        c.code.toLowerCase().includes(searchKeyword.toLowerCase()) || 
+                        c.name.toLowerCase().includes(searchKeyword.toLowerCase())
+                    );
+                }
+                
                 renderCourses();
             } else {
                 showToast('Không thể tải dữ liệu lớp học phần', 'danger');
@@ -232,23 +243,74 @@ function loadTeachersDropdown() {
         .catch(err => console.error('Lỗi tải danh sách giảng viên', err));
 }
 
+// Mở ca học cố định hàng tuần (động)
+function addScheduleRow(data = null) {
+    const container = document.getElementById('scheduleRowsContainer');
+    if(!container) return;
+    
+    const row = document.createElement('div');
+    row.className = 'row g-2 align-items-center schedule-row';
+    
+    const selectedDay = data ? data.day_of_week : 2;
+    const startTime = data ? data.start_time.substring(0, 5) : '08:00';
+    const endTime = data ? data.end_time.substring(0, 5) : '10:00';
+    const room = data ? data.room : '';
+    
+    row.innerHTML = `
+        <div class="col-md-3">
+            <select class="form-select form-select-sm schedule-day" required>
+                <option value="2" ${selectedDay == 2 ? 'selected' : ''}>Thứ hai</option>
+                <option value="3" ${selectedDay == 3 ? 'selected' : ''}>Thứ ba</option>
+                <option value="4" ${selectedDay == 4 ? 'selected' : ''}>Thứ tư</option>
+                <option value="5" ${selectedDay == 5 ? 'selected' : ''}>Thứ năm</option>
+                <option value="6" ${selectedDay == 6 ? 'selected' : ''}>Thứ sáu</option>
+                <option value="7" ${selectedDay == 7 ? 'selected' : ''}>Thứ bảy</option>
+                <option value="8" ${selectedDay == 8 ? 'selected' : ''}>Chủ nhật</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="time" class="form-control form-control-sm schedule-start" value="${startTime}" required>
+        </div>
+        <div class="col-md-2">
+            <input type="time" class="form-control form-control-sm schedule-end" value="${endTime}" required>
+        </div>
+        <div class="col-md-4">
+            <input type="text" class="form-control form-control-sm schedule-room" value="${room}" placeholder="Phòng học, vd: PM 101" required>
+        </div>
+        <div class="col-md-1 text-end">
+            <button type="button" class="btn btn-sm btn-outline-danger border-0 p-1" onclick="this.closest('.schedule-row').remove()" title="Xóa ca học">
+                <i class="bi bi-x-circle-fill"></i>
+            </button>
+        </div>
+    `;
+    container.appendChild(row);
+}
+
 // Mở modal tạo mới
 function openCreateModal() {
     currentCourseId = null;
     document.getElementById('modalTitle').innerText = 'Thêm lớp học phần mới';
     document.getElementById('courseForm').reset();
-    document.getElementById('coursePeriods').value = 45; // Default 3 credits * 15
+    document.getElementById('courseCredits').value = 3;
+    document.getElementById('coursePeriods').value = 45;
+    document.getElementById('totalSessions').value = 15;
+    
+    const container = document.getElementById('scheduleRowsContainer');
+    if(container) container.innerHTML = '';
+    addScheduleRow(); // Mặc định có 1 ca học trống
+    
     const modal = new bootstrap.Modal(document.getElementById('courseModal'));
     modal.show();
 }
 
-// Tính số tiết tự động dựa trên tín chỉ
-function calcPeriods() {
-    const credits = document.getElementById('courseCredits').value || 0;
+// Tính số tiết & số buổi tự động dựa trên tín chỉ
+function updateCreditsAndSessions() {
+    const credits = parseInt(document.getElementById('courseCredits').value) || 0;
     document.getElementById('coursePeriods').value = credits * 15;
+    document.getElementById('totalSessions').value = credits * 5;
 }
 
-// Mở modal chỉnh sửa
+// Mở modal chỉnh sửa và lấy lịch từ API
 function openEditModal(course) {
     currentCourseId = course.id;
     document.getElementById('modalTitle').innerText = 'Chỉnh sửa lớp học phần';
@@ -257,27 +319,94 @@ function openEditModal(course) {
     document.getElementById('classCode').value = course.class_code;
     document.getElementById('courseCredits').value = course.credits;
     document.getElementById('coursePeriods').value = course.periods;
+    document.getElementById('totalSessions').value = course.total_sessions || 15;
     document.getElementById('courseName').value = course.name;
     document.getElementById('courseDesc').value = course.description || '';
     document.getElementById('teacherId').value = course.teacher_id || '';
     
+    const container = document.getElementById('scheduleRowsContainer');
+    if(container) container.innerHTML = '';
+    
+    // Nạp lịch từ API để chắc chắn đầy đủ
+    fetch(`${BASE_URL}/api/courses/${course.id}`)
+        .then(res => res.json())
+        .then(res => {
+            if(res.status === 'success') {
+                const c = res.data;
+                if(c.schedules && c.schedules.length > 0) {
+                    c.schedules.forEach(sc => addScheduleRow(sc));
+                } else {
+                    addScheduleRow();
+                }
+            } else {
+                addScheduleRow();
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            addScheduleRow();
+        });
+        
     const modal = new bootstrap.Modal(document.getElementById('courseModal'));
     modal.show();
 }
 
-// C/U - Lưu khóa học
+// C/U - Lưu khóa học kèm lịch học cố định
 function saveCourse() {
+    const schedules = [];
+    const rows = document.querySelectorAll('.schedule-row');
+    let valid = true;
+    
+    rows.forEach(row => {
+        const day = row.querySelector('.schedule-day').value;
+        const start = row.querySelector('.schedule-start').value;
+        const end = row.querySelector('.schedule-end').value;
+        const room = row.querySelector('.schedule-room').value.trim();
+        
+        if (!day || !start || !end || !room) {
+            valid = false;
+            return;
+        }
+        
+        if (start >= end) {
+            valid = false;
+            showToast('Giờ kết thúc ca học phải lớn hơn giờ bắt đầu', 'warning');
+            return;
+        }
+        
+        schedules.push({
+            day_of_week: parseInt(day),
+            start_time: start + ':00',
+            end_time: end + ':00',
+            room: room
+        });
+    });
+    
+    if (!valid) {
+        if (schedules.length === 0 && rows.length > 0) {
+            showToast('Vui lòng điền đủ thông tin cho các ca học', 'warning');
+        }
+        return;
+    }
+    
+    if (schedules.length === 0) {
+        showToast('Vui lòng thêm ít nhất một ca học cố định', 'warning');
+        return;
+    }
+
     const data = {
         code: document.getElementById('courseCode').value.trim(),
         class_code: document.getElementById('classCode').value.trim(),
-        credits: document.getElementById('courseCredits').value,
-        periods: document.getElementById('coursePeriods').value,
+        credits: parseInt(document.getElementById('courseCredits').value),
+        periods: parseInt(document.getElementById('coursePeriods').value),
+        total_sessions: parseInt(document.getElementById('totalSessions').value),
         name: document.getElementById('courseName').value.trim(),
         description: document.getElementById('courseDesc').value.trim(),
-        teacher_id: document.getElementById('teacherId').value
+        teacher_id: document.getElementById('teacherId').value,
+        schedules: schedules
     };
 
-    if(!data.code || !data.class_code || !data.name || !data.credits || !data.teacher_id) {
+    if(!data.code || !data.class_code || !data.name || !data.credits || !data.total_sessions || !data.teacher_id) {
         showToast('Vui lòng điền đầy đủ các trường bắt buộc', 'warning');
         return;
     }
@@ -296,9 +425,8 @@ function saveCourse() {
     .then(res => {
         if(res.status === 'success') {
             showToast(res.message, 'success');
-            // Đóng modal
             bootstrap.Modal.getInstance(document.getElementById('courseModal')).hide();
-            loadCourses(); // Reload
+            loadCourses();
         } else {
             showToast(res.message, 'danger');
         }
@@ -311,7 +439,7 @@ function saveCourse() {
 
 // D - Xóa khóa học
 function deleteCourse(id) {
-    if(confirm('Bạn có chắc chắn muốn xóa lớp học phần này? Mọi dữ liệu liên kết như học sinh, điểm danh và tương tác sẽ bị ảnh hưởng!')) {
+    if(confirm('Bạn có chắc chắn muốn xóa lớp học phần này? Mọi dữ liệu liên kết như sinh viên, điểm danh và tương tác sẽ bị ảnh hưởng!')) {
         fetch(`${BASE_URL}/api/courses/${id}`, {
             method: 'DELETE'
         })
