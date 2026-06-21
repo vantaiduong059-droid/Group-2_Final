@@ -41,13 +41,24 @@ function loadTeachers() {
         .then(res => {
             if(res.status === 'success') {
                 teachersList = res.data;
+                
+                // Tự động lọc nếu có từ khóa search trên URL
+                const urlParams = new URLSearchParams(window.location.search);
+                const searchKeyword = urlParams.get('search');
+                if (searchKeyword) {
+                    teachersList = teachersList.filter(t => 
+                        t.username.toLowerCase().includes(searchKeyword.toLowerCase()) || 
+                        t.full_name.toLowerCase().includes(searchKeyword.toLowerCase())
+                    );
+                }
+                
                 renderTeachers();
             } else {
-                showToast('Không thể tải dữ liệu giáo viên', 'danger');
+                showToast('Không thể tải dữ liệu giảng viên', 'danger');
             }
         })
         .catch(err => {
-            showToast('Lỗi kết nối khi tải giáo viên', 'danger');
+            showToast('Lỗi kết nối khi tải giảng viên', 'danger');
             console.error(err);
         });
 }
@@ -215,7 +226,8 @@ function openTeacherModal() {
 function openTeacherEditModal(teacher) {
     currentTeacherId = teacher.id;
     document.getElementById('teacherModalTitle').innerText = 'Chỉnh sửa giảng viên';
-    document.getElementById('teacherName').value = teacher.full_name;
+    document.getElementById('teacherLastName').value = teacher.last_name || '';
+    document.getElementById('teacherFirstName').value = teacher.first_name || '';
     document.getElementById('teacherUsername').value = teacher.username;
     document.getElementById('teacherEmail').value = teacher.email;
     
@@ -226,13 +238,20 @@ function openTeacherEditModal(teacher) {
 // C/U - Lưu giảng viên
 function saveTeacher() {
     const data = {
-        full_name: document.getElementById('teacherName').value.trim(),
+        last_name: document.getElementById('teacherLastName').value.trim(),
+        first_name: document.getElementById('teacherFirstName').value.trim(),
         username: document.getElementById('teacherUsername').value.trim(),
         email: document.getElementById('teacherEmail').value.trim()
     };
 
-    if(!data.full_name || !data.username || !data.email) {
+    if(!data.last_name || !data.first_name || !data.username || !data.email) {
         showToast('Vui lòng điền đầy đủ các thông tin bắt buộc', 'warning');
+        return;
+    }
+
+    const nameRegex = /^[\p{L}\s]+$/u;
+    if(!nameRegex.test(data.last_name) || !nameRegex.test(data.first_name)) {
+        showToast('Họ tên chỉ được chứa chữ cái và khoảng trắng', 'warning');
         return;
     }
 
