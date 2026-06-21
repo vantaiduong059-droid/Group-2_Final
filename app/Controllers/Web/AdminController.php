@@ -40,7 +40,13 @@ class AdminController extends Controller {
         }
 
         // 5. Thống kê điểm danh (Tròn)
-        $stmt = $db->query("SELECT status, COUNT(*) as count FROM attendance_records GROUP BY status");
+        $stmt = $db->query("
+            SELECT ar.status, COUNT(*) as count 
+            FROM attendance_records ar
+            JOIN class_sessions cs ON ar.session_id = cs.id
+            WHERE cs.session_date = CURDATE()
+            GROUP BY ar.status
+        ");
         $attStatsRaw = $stmt->fetchAll();
         $attStats = ['present' => 0, 'late' => 0, 'absent' => 0];
         foreach($attStatsRaw as $row) {
