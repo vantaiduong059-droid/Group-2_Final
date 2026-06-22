@@ -54,12 +54,24 @@ class EngagementRepository extends BaseRepository {
         $course = $stmt->fetch();
         if (!$course) return false;
 
-        $pPts = (int)($course['rule_present_points'] ?? 2);
-        $lPts = (int)($course['rule_late_points'] ?? 1);
-        $aPts = (int)($course['rule_absent_points'] ?? 0);
-        $iPtsRule = (int)($course['rule_interaction_points'] ?? 1);
-        $attWeight = (int)($course['rule_attendance_weight'] ?? 50);
-        $quizWeight = (int)($course['rule_quiz_weight'] ?? 50);
+        // Lấy cấu hình mặc định từ hệ thống làm phương án dự phòng (fallback)
+        $stmtConfig = $db->prepare("SELECT config_key, config_value FROM system_configs");
+        $stmtConfig->execute();
+        $sysConfigs = $stmtConfig->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        $defPPts = (int)($sysConfigs['default_rule_present_points'] ?? 2);
+        $defLPts = (int)($sysConfigs['default_rule_late_points'] ?? 1);
+        $defAPts = (int)($sysConfigs['default_rule_absent_points'] ?? 0);
+        $defIPts = (int)($sysConfigs['default_rule_interaction_points'] ?? 1);
+        $defAttW = (int)($sysConfigs['default_rule_attendance_weight'] ?? 50);
+        $defQuizW = (int)($sysConfigs['default_rule_quiz_weight'] ?? 50);
+
+        $pPts = isset($course['rule_present_points']) ? (int)$course['rule_present_points'] : $defPPts;
+        $lPts = isset($course['rule_late_points']) ? (int)$course['rule_late_points'] : $defLPts;
+        $aPts = isset($course['rule_absent_points']) ? (int)$course['rule_absent_points'] : $defAPts;
+        $iPtsRule = isset($course['rule_interaction_points']) ? (int)$course['rule_interaction_points'] : $defIPts;
+        $attWeight = isset($course['rule_attendance_weight']) ? (int)$course['rule_attendance_weight'] : $defAttW;
+        $quizWeight = isset($course['rule_quiz_weight']) ? (int)$course['rule_quiz_weight'] : $defQuizW;
 
         // 2. Lấy số lượng buổi học của khóa học có trạng thái 'completed' hoặc 'active'
         $stmt = $db->prepare("SELECT COUNT(*) FROM class_sessions WHERE course_id = ? AND status IN ('completed', 'active')");
