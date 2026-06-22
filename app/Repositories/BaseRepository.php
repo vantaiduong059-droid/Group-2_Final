@@ -1,5 +1,4 @@
 <?php
-// app/Repositories/BaseRepository.php
 
 require_once '../core/Model.php';
 
@@ -22,5 +21,5 @@ abstract class BaseRepository {
         return $this->model->delete($id);
     }
 
-    // Các lớp con sẽ implement các hàm create, update phức tạp hơn
+
 }
