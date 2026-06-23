@@ -72,10 +72,11 @@ class AlertObserver implements ObserverInterface {
     }
     
     private function createAlertIfNotExists($db, $userId, $courseId, $message) {
-        // Kiểm tra xem đã cảnh báo với thông điệp tương tự chưa để tránh spam
+        // Kiểm tra xem đã cảnh báo với thông điệp tương tự chưa để tránh spam (trong vòng 24 giờ)
         $stmtCheck = $db->prepare("
             SELECT id FROM alerts 
-            WHERE user_id = ? AND course_id = ? AND message = ? AND is_read = 0
+            WHERE user_id = ? AND course_id = ? AND message = ? 
+              AND (is_read = 0 OR created_at > DATE_SUB(NOW(), INTERVAL 1 DAY))
         ");
         $stmtCheck->execute([$userId, $courseId, $message]);
         if (!$stmtCheck->fetch()) {
