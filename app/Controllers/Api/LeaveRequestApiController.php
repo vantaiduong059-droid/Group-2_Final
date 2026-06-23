@@ -31,6 +31,16 @@ class LeaveRequestApiController extends Controller {
             return;
         }
 
+        if (mb_strlen($reason) < 10) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Lý do xin phép phải có ít nhất 10 ký tự để giảng viên xem xét.'], 400);
+            return;
+        }
+
+        if (mb_strlen($reason) > 500) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Lý do xin phép không được vượt quá 500 ký tự.'], 400);
+            return;
+        }
+
         $db = Database::getInstance()->getConnection();
 
         // Kiểm tra sinh viên có đăng ký học phần này không
