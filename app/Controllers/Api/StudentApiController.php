@@ -146,6 +146,20 @@ class StudentApiController extends Controller {
             ");
             $stmtSessions->execute($courseIds);
             $activeSessions = $stmtSessions->fetchAll();
+
+            foreach ($activeSessions as &$session) {
+                $stmtCheckAtt = $db->prepare("SELECT status FROM attendance_records WHERE session_id = ? AND student_id = ?");
+                $stmtCheckAtt->execute([$session['id'], $studentId]);
+                $attRecord = $stmtCheckAtt->fetch();
+                if ($attRecord) {
+                    $session['student_already_attended'] = true;
+                    $session['my_attendance_status'] = $attRecord['status'];
+                } else {
+                    $session['student_already_attended'] = false;
+                    $session['my_attendance_status'] = null;
+                }
+            }
+            unset($session);
         }
 
         // 5. Cảnh báo học tập của sinh viên
