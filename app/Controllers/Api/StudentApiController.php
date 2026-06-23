@@ -200,6 +200,49 @@ class StudentApiController extends Controller {
     }
 
     /**
+     * Đổi mật khẩu cho Sinh viên
+     */
+    public function changePassword() {
+        if ($_SESSION['user']['role'] !== 'student') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Chức năng dành cho Sinh viên.'], 403);
+        }
+
+        $data = $this->getJsonInput();
+        $studentId = $_SESSION['user']['id'];
+        $currentPassword = $data['current_password'] ?? '';
+        $newPassword = $data['new_password'] ?? '';
+
+        if (empty($currentPassword) || empty($newPassword)) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng cung cấp mật khẩu cũ và mới.'], 400);
+        }
+
+        if (strlen($newPassword) < 6) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Mật khẩu mới phải có ít nhất 6 ký tự.'], 400);
+        }
+
+        $db = Database::getInstance()->getConnection();
+        
+        // Lấy password hash hiện tại
+        $stmt = $db->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt->execute([$studentId]);
+        $storedHash = $stmt->fetchColumn();
+
+        if (!$storedHash || !password_verify($currentPassword, $storedHash)) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Mật khẩu hiện tại không chính xác.'], 400);
+        }
+
+        // Cập nhật mật khẩu mới
+        $newHash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $stmtUpdate = $db->prepare("UPDATE users SET password = ? WHERE id = ?");
+        
+        if ($stmtUpdate->execute([$newHash, $studentId])) {
+            $this->jsonResponse(['status' => 'success', 'message' => 'Cập nhật mật khẩu thành công.']);
+        } else {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Không thể cập nhật mật khẩu.'], 500);
+        }
+    }
+
+    /**
      * Lấy danh sách ngành học (majors)
      */
     public function getMajors() {
