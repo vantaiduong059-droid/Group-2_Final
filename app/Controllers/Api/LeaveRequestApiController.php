@@ -222,7 +222,16 @@ class LeaveRequestApiController extends Controller {
 
                 $msg = 'Đã duyệt đơn xin phép. Điểm danh sinh viên được cập nhật thành "Có phép".';
             } else {
-                $msg = 'Đã từ chối đơn xin phép.';
+                if ($leaveReq['status'] === 'approved') {
+                    $stmtUpdateAtt = $db->prepare("
+                        UPDATE attendance_records SET status = 'absent', method_id = 3, recorded_at = CURRENT_TIMESTAMP
+                        WHERE session_id = ? AND student_id = ?
+                    ");
+                    $stmtUpdateAtt->execute([$leaveReq['session_id'], $leaveReq['student_id']]);
+                    $msg = 'Đã từ chối đơn xin phép. Trạng thái điểm danh được cập nhật thành "Vắng mặt".';
+                } else {
+                    $msg = 'Đã từ chối đơn xin phép.';
+                }
             }
 
             $this->jsonResponse(['status' => 'success', 'message' => $msg]);
