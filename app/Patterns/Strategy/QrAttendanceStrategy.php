@@ -32,8 +32,9 @@ class QrAttendanceStrategy implements AttendanceStrategyInterface {
             return ['success' => false, 'message' => 'Buổi học chưa được cấu hình điểm danh bằng QR.'];
         }
 
-        // Kiểm tra thời gian hết hạn
-        if ($expiresAt && strtotime($expiresAt) < time()) {
+        // Kiểm tra thời gian hết hạn bằng helper chung
+        $statusInfo = AttendanceSessionHelper::getStatus($session);
+        if ($statusInfo['status'] === 'da_dong') {
             return ['success' => false, 'message' => 'Mã QR điểm danh đã hết hạn.'];
         }
 

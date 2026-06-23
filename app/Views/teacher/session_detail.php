@@ -304,32 +304,93 @@ $sessionId = $s['id'];
 
 <!-- Discussion Detail Modal -->
 <div class="modal fade" id="discussionDetailModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-xl">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title fw-bold text-primary" id="discussDetailTitle">Chủ đề thảo luận</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <div class="modal-body d-flex flex-column gap-3">
-                <!-- Mô tả chủ đề -->
-                <div class="p-3 bg-light rounded" id="discussDetailContent" style="white-space: pre-wrap; font-size: 0.9rem; border-left: 4px solid #2563eb;">
-                    Đang tải...
-                </div>
-                
-                <!-- Danh sách bình luận -->
-                <div>
-                    <h6 class="fw-bold mb-2">Bình luận lớp học</h6>
-                    <div id="discussRepliesList" class="d-flex flex-column gap-2 overflow-auto" style="max-height: 300px; padding-right: 5px;">
-                        <div class="text-center py-3 text-muted"><i class="bi bi-arrow-repeat spin"></i> Đang tải...</div>
-                    </div>
-                </div>
+            <div class="modal-body">
+                <!-- Tabs -->
+                <ul class="nav nav-pills mb-3" id="discussDetailTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="discuss-general-tab" data-bs-toggle="pill" data-bs-target="#discuss-general-pane" type="button"><i class="bi bi-chat-left-text me-1"></i>Thảo luận chung</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="discuss-grading-tab" data-bs-toggle="pill" data-bs-target="#discuss-grading-pane" type="button" onclick="loadDiscussionSubmissions()"><i class="bi bi-award me-1"></i>Chấm điểm sinh viên</button>
+                    </li>
+                </ul>
 
-                <!-- Nhập bình luận mới -->
-                <div class="mt-2">
-                    <label class="fw-semibold small mb-1">Gửi bình luận mới</label>
-                    <div class="input-group">
-                        <textarea class="form-control" id="newReplyContent" rows="2" placeholder="Nhập nội dung thảo luận với cả lớp..."></textarea>
-                        <button class="btn btn-primary-modern px-3" onclick="submitReply()"><i class="bi bi-send-fill fs-5"></i></button>
+                <div class="tab-content" id="discussDetailTabContent">
+                    <!-- Tab 1: Thảo luận chung -->
+                    <div class="tab-pane fade show active" id="discuss-general-pane">
+                        <div class="d-flex flex-column gap-3">
+                            <!-- Mô tả chủ đề -->
+                            <div class="p-3 bg-light rounded" id="discussDetailContent" style="white-space: pre-wrap; font-size: 0.9rem; border-left: 4px solid #2563eb; color: #1e293b;">
+                                Đang tải...
+                            </div>
+                            
+                            <!-- Danh sách bình luận -->
+                            <div>
+                                <h6 class="fw-bold mb-2">Bình luận lớp học</h6>
+                                <div id="discussRepliesList" class="d-flex flex-column gap-2 overflow-auto" style="max-height: 280px; padding-right: 5px;">
+                                    <div class="text-center py-3 text-muted"><i class="bi bi-arrow-repeat spin"></i> Đang tải...</div>
+                                </div>
+                            </div>
+
+                            <!-- Nhập bình luận mới -->
+                            <div class="mt-2">
+                                <label class="fw-semibold small mb-1">Gửi bình luận mới</label>
+                                <div class="input-group">
+                                    <textarea class="form-control" id="newReplyContent" rows="2" placeholder="Nhập nội dung thảo luận với cả lớp..."></textarea>
+                                    <button class="btn btn-primary-modern px-3" onclick="submitReply()"><i class="bi bi-send-fill fs-5"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2: Chấm điểm sinh viên -->
+                    <div class="tab-pane fade" id="discuss-grading-pane">
+                        <div class="row g-3">
+                            <!-- Cột bên trái: Danh sách bài nộp -->
+                            <div class="col-md-5 border-end">
+                                <h6 class="fw-bold mb-2">Sinh viên đã phản hồi</h6>
+                                <div id="discussSubmissionsList" class="list-group overflow-auto" style="max-height: 380px; padding-right: 5px;">
+                                    <div class="text-center py-3 text-muted"><i class="bi bi-arrow-repeat spin"></i> Đang tải danh sách bài nộp...</div>
+                                </div>
+                            </div>
+                            <!-- Cột bên phải: Xem bài & chấm điểm -->
+                            <div class="col-md-7">
+                                <h6 class="fw-bold mb-2">Chi tiết bài làm & Chấm điểm</h6>
+                                <div id="submissionDetailSection" class="p-3 bg-light rounded border d-none" style="min-height: 250px;">
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <div>
+                                            <h6 class="fw-bold mb-0 text-primary" id="gradeStudentName">Nguyễn Văn A</h6>
+                                            <span class="text-muted small" id="gradeStudentCode">student1</span>
+                                        </div>
+                                        <span class="text-muted small" id="gradeSubmitTime">20:30</span>
+                                    </div>
+                                    <div class="mb-3 p-3 bg-white rounded border" id="gradeContentText" style="white-space: pre-wrap; font-size: 0.9rem; max-height: 200px; overflow-y: auto; color: #1e293b;">
+                                        Nội dung câu trả lời của sinh viên...
+                                    </div>
+                                    <div class="row g-2 align-items-center">
+                                        <div class="col-sm-4">
+                                            <label class="fw-semibold small mb-0">Điểm thảo luận (0-10)</label>
+                                        </div>
+                                        <div class="col-sm-5">
+                                            <input type="number" step="0.25" min="0" max="10" class="form-control form-control-sm" id="discussionScore" placeholder="Nhập điểm số (0 - 10)...">
+                                        </div>
+                                        <div class="col-sm-3">
+                                            <button class="btn btn-primary-modern btn-sm w-100" onclick="saveDiscussionGrade()"><i class="bi bi-save me-1"></i>Lưu điểm</button>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div id="submissionDetailPlaceholder" class="text-center py-5 text-muted">
+                                    <i class="bi bi-info-circle fs-2 d-block mb-2 text-primary"></i>
+                                    Chọn một sinh viên từ danh sách bên trái để xem nội dung và chấm điểm.
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -651,9 +712,16 @@ function viewDiscussionDetail(discId, titleEncoded, descEncoded) {
     document.getElementById('discussDetailTitle').textContent = 'Thảo luận: ' + title;
     document.getElementById('discussDetailContent').textContent = desc || 'Không có mô tả.';
     document.getElementById('newReplyContent').value = '';
+
+    // Đưa tab hoạt động về thảo luận chung
+    const triggerEl = document.querySelector('#discussDetailTabs button[id="discuss-general-tab"]');
+    if (triggerEl) {
+        const tabInstance = bootstrap.Tab.getOrCreateInstance(triggerEl);
+        tabInstance.show();
+    }
     
     // Mở modal
-    const modal = new bootstrap.Modal(document.getElementById('discussionDetailModal'));
+    const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('discussionDetailModal'));
     modal.show();
     
     loadDiscussionReplies(discId);
@@ -706,6 +774,103 @@ function submitReply() {
             loadDiscussionReplies(activeDiscussId);
             loadQuizDiscuss();
         }
+    });
+}
+
+let currentSelectedReplyId = null;
+
+function loadDiscussionSubmissions() {
+    const listEl = document.getElementById('discussSubmissionsList');
+    listEl.innerHTML = '<div class="text-center py-3 text-muted"><i class="bi bi-arrow-repeat spin"></i> Đang tải...</div>';
+    
+    // Reset phần chi tiết
+    document.getElementById('submissionDetailSection').classList.add('d-none');
+    document.getElementById('submissionDetailPlaceholder').classList.remove('d-none');
+    currentSelectedReplyId = null;
+
+    fetch(`${BASE_URL}/api/teacher/discussions/${activeDiscussId}/submissions`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.status !== 'success') {
+                listEl.innerHTML = '<div class="text-danger text-center py-3">Lỗi tải bài nộp.</div>';
+                return;
+            }
+            if (!res.data || res.data.length === 0) {
+                listEl.innerHTML = '<div class="text-muted text-center py-4">Chưa có sinh viên nào phản hồi thảo luận này.</div>';
+                return;
+            }
+            listEl.innerHTML = res.data.map(sub => {
+                const scoreText = sub.score !== null ? `<span class="badge bg-success small">${sub.score} / 10</span>` : '<span class="badge bg-warning text-dark small">Chưa chấm</span>';
+                const escapedContent = encodeURIComponent(sub.content);
+                const escapedName = encodeURIComponent(sub.student_name);
+                const timeStr = sub.created_at ? sub.created_at.slice(0, 16) : '--';
+                return `<button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center gap-2" onclick="selectStudentSubmission(${sub.reply_id}, '${escapedName}', '${sub.student_code}', '${escapedContent}', ${sub.score}, '${timeStr}')">
+                    <div>
+                        <div class="fw-semibold small">${sub.student_name}</div>
+                        <div class="text-muted" style="font-size:0.75rem;">${sub.student_code}</div>
+                    </div>
+                    ${scoreText}
+                </button>`;
+            }).join('');
+        }).catch(err => {
+            listEl.innerHTML = '<div class="text-danger text-center py-3">Lỗi kết nối máy chủ.</div>';
+        });
+}
+
+function selectStudentSubmission(replyId, studentNameEncoded, studentCode, contentEncoded, score, submitTime) {
+    currentSelectedReplyId = replyId;
+    const studentName = decodeURIComponent(studentNameEncoded);
+    const content = decodeURIComponent(contentEncoded);
+    
+    // Highlight item được chọn
+    document.querySelectorAll('#discussSubmissionsList .list-group-item').forEach(item => {
+        item.classList.remove('active');
+    });
+    event.currentTarget.classList.add('active');
+
+    // Cập nhật thông tin chi tiết
+    document.getElementById('gradeStudentName').textContent = studentName;
+    document.getElementById('gradeStudentCode').textContent = studentCode;
+    document.getElementById('gradeSubmitTime').textContent = 'Nộp lúc: ' + submitTime;
+    document.getElementById('gradeContentText').textContent = content;
+    
+    // Gán điểm số vào ô input
+    const scoreInput = document.getElementById('discussionScore');
+    scoreInput.value = score !== null && score !== undefined && score !== 'null' ? score : '';
+
+    // Hiện khu vực chấm điểm, ẩn placeholder
+    document.getElementById('submissionDetailSection').classList.remove('d-none');
+    document.getElementById('submissionDetailPlaceholder').classList.add('d-none');
+}
+
+function saveDiscussionGrade() {
+    if (!currentSelectedReplyId) {
+        showToast('Vui lòng chọn sinh viên để chấm điểm.', 'warning');
+        return;
+    }
+    const scoreVal = document.getElementById('discussionScore').value.trim();
+    if (scoreVal === '') {
+        showToast('Vui lòng nhập điểm số.', 'warning');
+        return;
+    }
+    const score = parseFloat(scoreVal);
+    if (isNaN(score) || score < 0 || score > 10) {
+        showToast('Điểm số phải nằm trong khoảng từ 0 đến 10.', 'warning');
+        return;
+    }
+
+    fetch(`${BASE_URL}/api/teacher/discussions/replies/${currentSelectedReplyId}/grade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score })
+    }).then(r => r.json()).then(res => {
+        showToast(res.message, res.status === 'success' ? 'success' : 'danger');
+        if (res.status === 'success') {
+            loadDiscussionSubmissions();
+            loadQuizDiscuss();
+        }
+    }).catch(err => {
+        showToast('Không thể kết nối máy chủ.', 'danger');
     });
 }
 
@@ -777,26 +942,17 @@ function loadComplaints() {
         .then(r => r.json()).then(res => {
             const el = document.getElementById('complaintsList');
             if (!res.data || res.data.length === 0) { el.innerHTML = '<div class="text-muted text-center py-4">Không có khiếu nại nào</div>'; return; }
-            el.innerHTML = res.data.map(c => `<div class="log-item mb-3"><div class="d-flex justify-content-between align-items-start">
-                <div><strong class="small">${c.student_name}</strong> <span class="text-muted small">${c.student_email}</span></div>
-                <span class="badge ${c.status === 'resolved' ? 'bg-success' : 'bg-warning text-dark'}">${c.status === 'resolved' ? 'Đã xử lý' : 'Chưa xử lý'}</span>
-            </div>
-            <div class="small mt-1">${c.description}</div>
-            ${c.status === 'pending' ? `<div class="mt-2 d-flex gap-2"><input type="text" class="form-control form-control-sm" id="note_${c.id}" placeholder="Ghi chú xử lý..."><button class="btn btn-sm btn-success" onclick="resolveComplaint(${c.id})">Xử lý</button></div>` : `<div class="text-muted small mt-1">Ghi chú: ${c.teacher_note || '--'}</div>`}
-            <div class="text-muted small mt-1">${c.created_at?.slice(0,16)}</div></div>`).join('');
+            el.innerHTML = res.data.map(c => `<div class="log-item mb-3 p-3 border rounded bg-light">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <div>
+                        <strong class="text-dark small">${c.student_name}</strong> 
+                        <span class="text-muted small">(${c.student_email})</span>
+                    </div>
+                    <span class="text-muted small"><i class="bi bi-clock me-1"></i>${c.created_at?.slice(0,16)}</span>
+                </div>
+                <div class="text-dark small bg-white p-2.5 rounded border" style="white-space: pre-wrap;">${c.description}</div>
+            </div>`).join('');
         });
-}
-
-function resolveComplaint(id) {
-    const note = document.getElementById('note_'+id)?.value.trim() || '';
-    fetch(`${BASE_URL}/api/attendance/complaint/${id}/resolve`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teacher_note: note })
-    }).then(r => r.json()).then(res => {
-        showToast(res.message, res.status === 'success' ? 'success' : 'danger');
-        if (res.status === 'success') loadComplaints();
-    });
 }
 </script>
 

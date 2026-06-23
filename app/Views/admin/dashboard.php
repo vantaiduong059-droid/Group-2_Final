@@ -26,7 +26,7 @@
                 <i class="bi bi-people-fill"></i>
             </div>
             <div class="stat-info flex-grow-1">
-                <div class="title">Tổng học sinh</div>
+                <div class="title">Tổng sinh viên</div>
                 <div class="value" id="statStudents"><?= number_format($totalStudents) ?></div>
                 <div class="trend text-muted"><i class="bi bi-dash"></i> Cập nhật gần đây</div>
             </div>
@@ -167,7 +167,7 @@
                 <div class="card-modern">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <h5 class="card-title-modern mb-0">Sự kiện sắp tới</h5>
-                         <a href="<?= BASE_URL ?>/admin/sessions" class="text-decoration-none text-primary fw-medium small">Xem tất cả</a>
+                        <a href="<?= BASE_URL ?>/admin/sessions" class="text-decoration-none text-primary fw-medium small">Xem tất cả</a>
                     </div>
                     
                     <?php if (empty($upcomingEvents)): ?>
@@ -184,7 +184,7 @@
                             <div class="text-muted small"><i class="bi bi-clock me-1"></i> <?= date('H:i', strtotime($event['start_time'])) ?></div>
                         </div>
                         <i class="bi bi-chevron-right text-muted"></i>
-                    </div>
+                    </a>
                     <?php endforeach; ?>
                     <?php endif; ?>
                 </div>

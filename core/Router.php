@@ -36,11 +36,6 @@ class Router {
             $uri = substr($uri, strlen($scriptName));
         }
 
-        // Loại bỏ /index.php nếu truy cập trực tiếp qua index.php trong URL
-        if (strpos($uri, '/index.php') === 0) {
-            $uri = substr($uri, 10);
-        }
-
         $uri = rtrim($uri, '/');
         if (empty($uri)) {
             $uri = '/'; // route mặc định
@@ -75,7 +70,7 @@ class Router {
                     $controller = new $controllerName();
                     
                     if (method_exists($controller, $methodName)) {
-                        call_user_func_array([$controller, $methodName], $params);
+                        call_user_func_array([$controller, $methodName], array_values($params));
                         return;
                     } else {
                         $this->sendNotFound("Method $methodName not found in $controllerName");

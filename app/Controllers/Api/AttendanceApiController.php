@@ -174,20 +174,31 @@ class AttendanceApiController extends Controller {
         $result = $strategy->validateAndRecord($sessionId, $studentId, ['status' => $status]);
 
         if ($result['success']) {
+            $db = Database::getInstance()->getConnection();
+            
+            // Tự động chuyển trạng thái buổi học sang completed nếu đang là scheduled
+            $stmtStatus = $db->prepare("SELECT status FROM class_sessions WHERE id = ?");
+            $stmtStatus->execute([$sessionId]);
+            $currentSessStatus = $stmtStatus->fetchColumn();
+            if ($currentSessStatus === 'scheduled') {
+                $stmtUpdateStatus = $db->prepare("UPDATE class_sessions SET status = 'completed' WHERE id = ?");
+                $stmtUpdateStatus->execute([$sessionId]);
+            }
+
             $this->attendanceRepo->saveRecord($sessionId, $studentId, $result['method_id'], $result['status']);
             
-            // Kích hoạt Observer để kiểm tra cảnh báo
-            $subject = new AttendanceSubject();
-            $subject->attach(new AlertObserver());
-            $subject->recordAttendance($sessionId, $studentId, $result['status']);
-
-            // Tính toán lại CPI
-            $stmtSession = Database::getInstance()->getConnection()->prepare("SELECT course_id FROM class_sessions WHERE id = ?");
+            // Tính toán lại CPI trước
+            $stmtSession = $db->prepare("SELECT course_id FROM class_sessions WHERE id = ?");
             $stmtSession->execute([$sessionId]);
             $courseId = $stmtSession->fetchColumn();
             if ($courseId) {
                 $this->engagementRepo->recalculateScore($courseId, $studentId);
             }
+
+            // Kích hoạt Observer để kiểm tra cảnh báo sau khi CPI đã cập nhật
+            $subject = new AttendanceSubject();
+            $subject->attach(new AlertObserver());
+            $subject->recordAttendance($sessionId, $studentId, $result['status']);
 
             $this->jsonResponse(['status' => 'success', 'message' => 'Cập nhật thành công.']);
         } else {
@@ -211,63 +222,178 @@ class AttendanceApiController extends Controller {
             $this->jsonResponse(['status' => 'error', 'message' => 'Thiếu ID buổi học.'], 400);
         }
 
-        try {
-            // Kiểm tra xem sinh viên có thuộc lớp này không
-            $db = Database::getInstance()->getConnection();
-            $stmtCheckEnroll = $db->prepare("
-                SELECT cs.course_id 
-                FROM class_sessions cs
-                JOIN course_students cstud ON cs.course_id = cstud.course_id
-                WHERE cs.id = ? AND cstud.student_id = ?
-            ");
-            $stmtCheckEnroll->execute([$sessionId, $studentId]);
-            $courseId = $stmtCheckEnroll->fetchColumn();
+        // Kiểm tra xem sinh viên có thuộc lớp này không
+        $db = Database::getInstance()->getConnection();
+        $stmtCheckEnroll = $db->prepare("
+            SELECT cs.course_id 
+            FROM class_sessions cs
+            JOIN course_students cstud ON cs.course_id = cstud.course_id
+            WHERE cs.id = ? AND cstud.student_id = ?
+        ");
+        $stmtCheckEnroll->execute([$sessionId, $studentId]);
+        $courseId = $stmtCheckEnroll->fetchColumn();
 
-            if (!$courseId) {
-                $this->jsonResponse(['status' => 'error', 'message' => 'Bạn không đăng ký học phần này.'], 403);
-            }
-
-            // Xác định hình thức và Strategy tương ứng
-            $stmtSession = $db->prepare("SELECT qr_token, attendance_code FROM class_sessions WHERE id = ?");
-            $stmtSession->execute([$sessionId]);
-            $sessInfo = $stmtSession->fetch();
-            
-            $strategy = null;
-            if (isset($data['qr_token']) && !empty($data['qr_token'])) {
-                $strategy = new QrAttendanceStrategy();
-            } else if (isset($data['code']) && !empty($data['code'])) {
-                $strategy = new CodeAttendanceStrategy();
-            } else {
-                $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng cung cấp mã Code hoặc QR token để điểm danh.'], 400);
-            }
-
-            $result = $strategy->validateAndRecord($sessionId, $studentId, $data);
-
-            if ($result['success']) {
-                // Lưu bản ghi điểm danh
-                $this->attendanceRepo->saveRecord($sessionId, $studentId, $result['method_id'], $result['status']);
-                
-                // Kích hoạt Observer để kiểm tra cảnh báo
-                $subject = new AttendanceSubject();
-                $subject->attach(new AlertObserver());
-                $subject->recordAttendance($sessionId, $studentId, $result['status']);
-
-                // Tính toán lại CPI
-                $this->engagementRepo->recalculateScore($courseId, $studentId);
-
-                $this->jsonResponse([
-                    'status' => 'success', 
-                    'message' => $result['message'],
-                    'data' => [
-                        'status' => $result['status'],
-                        'recorded_at' => date('Y-m-d H:i:s')
-                    ]
-                ]);
-            } else {
-                $this->jsonResponse(['status' => 'error', 'message' => $result['message']], 400);
-            }
-        } catch (Exception $e) {
-            $this->jsonResponse(['status' => 'error', 'message' => 'Lỗi hệ thống khi điểm danh: ' . $e->getMessage()], 500);
+        if (!$courseId) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Bạn không đăng ký học phần này.'], 403);
         }
+
+        // Xác định hình thức và Strategy tương ứng
+        $stmtSession = $db->prepare("SELECT qr_token, attendance_code FROM class_sessions WHERE id = ?");
+        $stmtSession->execute([$sessionId]);
+        $sessInfo = $stmtSession->fetch();
+        
+        $strategy = null;
+        if (isset($data['qr_token']) && !empty($data['qr_token'])) {
+            $strategy = new QrAttendanceStrategy();
+        } else if (isset($data['code']) && !empty($data['code'])) {
+            $strategy = new CodeAttendanceStrategy();
+        } else {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng cung cấp mã Code hoặc QR token để điểm danh.'], 400);
+        }
+
+        $result = $strategy->validateAndRecord($sessionId, $studentId, $data);
+
+        if ($result['success']) {
+            // Lưu bản ghi điểm danh
+            $this->attendanceRepo->saveRecord($sessionId, $studentId, $result['method_id'], $result['status']);
+            
+            // Tính toán lại CPI trước
+            $this->engagementRepo->recalculateScore($courseId, $studentId);
+
+            // Kích hoạt Observer để kiểm tra cảnh báo sau khi CPI đã cập nhật
+            $subject = new AttendanceSubject();
+            $subject->attach(new AlertObserver());
+            $subject->recordAttendance($sessionId, $studentId, $result['status']);
+
+            $this->jsonResponse([
+                'status' => 'success', 
+                'message' => $result['message'],
+                'data' => [
+                    'status' => $result['status'],
+                    'recorded_at' => date('Y-m-d H:i:s')
+                ]
+            ]);
+        } else {
+            $this->jsonResponse(['status' => 'error', 'message' => $result['message']], 400);
+        }
+    }
+
+    /**
+     * Giảng viên sửa điểm danh CÓ LOG (Phase 4)
+     */
+    public function editWithLog($sessionId) {
+        $role = $_SESSION['user']['role'];
+        if ($role === 'student') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Forbidden'], 403);
+        }
+
+        $data = $this->getJsonInput();
+        $studentId = $data['student_id'] ?? null;
+        $newStatus = $data['status'] ?? null;
+        $oldStatus = $data['old_status'] ?? null;
+        $reason    = trim($data['reason'] ?? '');
+
+        if (!$studentId || !$newStatus || !$reason) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Thiếu student_id, status hoặc lý do.'], 400);
+        }
+
+        // Lấy trạng thái cũ nếu không được truyền
+        if (!$oldStatus) {
+            $current = $this->attendanceRepo->getRecordBySessionAndStudent($sessionId, $studentId);
+            $oldStatus = $current['status'] ?? null;
+        }
+
+        $db = Database::getInstance()->getConnection();
+
+        // Tự động chuyển trạng thái buổi học sang completed nếu đang là scheduled
+        $stmtStatus = $db->prepare("SELECT status FROM class_sessions WHERE id = ?");
+        $stmtStatus->execute([$sessionId]);
+        $currentSessStatus = $stmtStatus->fetchColumn();
+        if ($currentSessStatus === 'scheduled') {
+            $stmtUpdateStatus = $db->prepare("UPDATE class_sessions SET status = 'completed' WHERE id = ?");
+            $stmtUpdateStatus->execute([$sessionId]);
+        }
+
+        // Lưu thay đổi
+        $this->attendanceRepo->saveRecord($sessionId, $studentId, 3, $newStatus); // method 3 = Manual
+
+        // Log thay đổi
+        $changedBy = $_SESSION['user']['id'];
+        $this->attendanceRepo->logChange($sessionId, $studentId, $changedBy, $oldStatus, $newStatus, $reason);
+
+        // Recalculate engagement
+        $stmt = $db->prepare("SELECT course_id FROM class_sessions WHERE id = ?");
+        $stmt->execute([$sessionId]);
+        $courseId = $stmt->fetchColumn();
+        if ($courseId) {
+            $this->engagementRepo->recalculateScore($courseId, $studentId);
+        }
+
+        $this->jsonResponse(['status' => 'success', 'message' => 'Đã sửa điểm danh và ghi log thành công.']);
+    }
+
+    /**
+     * Lấy log thay đổi điểm danh của buổi học
+     */
+    public function getChangeLogs($sessionId) {
+        if ($_SESSION['user']['role'] === 'student') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Forbidden'], 403);
+        }
+        $logs = $this->attendanceRepo->getChangeLogs($sessionId);
+        $this->jsonResponse(['status' => 'success', 'data' => $logs]);
+    }
+
+    /**
+     * Lấy danh sách khiếu nại của buổi học (Giảng viên)
+     */
+    public function getComplaints($sessionId) {
+        if ($_SESSION['user']['role'] === 'student') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Forbidden'], 403);
+        }
+        $complaints = $this->attendanceRepo->getComplaintsBySession($sessionId);
+        $this->jsonResponse(['status' => 'success', 'data' => $complaints]);
+    }
+
+    /**
+     * Sinh viên gửi khiếu nại
+     */
+    public function submitComplaint() {
+        if ($_SESSION['user']['role'] !== 'student') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Chỉ sinh viên mới được gửi khiếu nại.'], 403);
+        }
+
+        $data = $this->getJsonInput();
+        $sessionId   = $data['session_id'] ?? null;
+        $description = trim($data['description'] ?? '');
+
+        if (!$sessionId || !$description) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Thiếu session_id hoặc mô tả.'], 400);
+        }
+
+        $studentId = $_SESSION['user']['id'];
+
+        // Kiểm tra SV có trong lớp không
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("SELECT 1 FROM class_sessions cs JOIN course_students cstu ON cs.course_id = cstu.course_id WHERE cs.id = ? AND cstu.student_id = ?");
+        $stmt->execute([$sessionId, $studentId]);
+        if (!$stmt->fetch()) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Bạn không có quyền khiếu nại buổi học này.'], 403);
+        }
+
+        $this->attendanceRepo->submitComplaint($studentId, $sessionId, $description);
+        $this->jsonResponse(['status' => 'success', 'message' => 'Đã gửi khiếu nại thành công. Giảng viên sẽ xem xét.']);
+    }
+
+    /**
+     * Giảng viên xử lý khiếu nại
+     */
+    public function resolveComplaint($complaintId) {
+        if ($_SESSION['user']['role'] === 'student') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Forbidden'], 403);
+        }
+        $data = $this->getJsonInput();
+        $note = trim($data['teacher_note'] ?? '');
+        $this->attendanceRepo->resolveComplaint($complaintId, $note);
+        $this->jsonResponse(['status' => 'success', 'message' => 'Đã xử lý khiếu nại.']);
     }
 }

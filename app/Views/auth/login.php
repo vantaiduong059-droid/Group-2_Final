@@ -147,6 +147,13 @@
         <h3 class="fw-bold text-dark mb-1">Đăng nhập hệ thống</h3>
         <p class="text-muted mb-4">Vui lòng chọn vai trò và nhập thông tin để tiếp tục.</p>
 
+        <?php if (isset($error)): ?>
+            <div class="alert alert-danger py-2.5 px-3 mb-3 small border-0 d-flex align-items-center gap-2" style="border-radius: 8px; background-color: #fef2f2; color: #991b1b;">
+                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+                <span class="fw-medium"><?= htmlspecialchars($error) ?></span>
+            </div>
+        <?php endif; ?>
+
         <form action="<?= BASE_URL ?>/login" method="POST">
             
             <!-- Chọn Vai trò -->

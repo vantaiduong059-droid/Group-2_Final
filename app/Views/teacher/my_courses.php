@@ -48,12 +48,15 @@
                     </div>
                 </div>
                 <hr class="my-3">
-                <div class="d-flex gap-2">
-                    <a href="<?= BASE_URL ?>/teacher/course-students/<?= $c['id'] ?>" class="btn btn-sm btn-outline-primary flex-fill" onclick="event.stopPropagation()">
-                        <i class="bi bi-people me-1"></i>Danh sách sinh viên
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="<?= BASE_URL ?>/teacher/course-students/<?= $c['id'] ?>" class="btn btn-sm btn-outline-primary flex-fill text-nowrap" onclick="event.stopPropagation()">
+                        <i class="bi bi-people me-1"></i>Danh sách SV
                     </a>
-                    <a href="<?= BASE_URL ?>/teacher/sessions?course_id=<?= $c['id'] ?>" class="btn btn-sm btn-outline-secondary flex-fill" onclick="event.stopPropagation()">
+                    <a href="<?= BASE_URL ?>/teacher/sessions?course_id=<?= $c['id'] ?>" class="btn btn-sm btn-outline-secondary flex-fill text-nowrap" onclick="event.stopPropagation()">
                         <i class="bi bi-calendar me-1"></i>Lịch học
+                    </a>
+                    <a href="<?= BASE_URL ?>/teacher/course/<?= $c['id'] ?>/current-session" class="btn btn-sm btn-outline-info flex-fill text-nowrap" onclick="event.stopPropagation()">
+                        <i class="bi bi-info-circle me-1"></i>Chi tiết buổi học
                     </a>
                 </div>
             </div>

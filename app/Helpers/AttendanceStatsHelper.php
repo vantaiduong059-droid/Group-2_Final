@@ -13,7 +13,7 @@ class AttendanceStatsHelper {
         $stmtPassed = $db->prepare("
             SELECT COUNT(*) 
             FROM class_sessions 
-            WHERE course_id = ? AND CONCAT(session_date, ' ', end_time) < NOW()
+            WHERE course_id = ? AND status IN ('completed', 'active')
         ");
         $stmtPassed->execute([$courseId]);
         $passedSessions = (int)$stmtPassed->fetchColumn();
@@ -28,7 +28,7 @@ class AttendanceStatsHelper {
             FROM attendance_records ar
             JOIN class_sessions cs ON ar.session_id = cs.id
             WHERE cs.course_id = ? AND ar.student_id = ? AND ar.status = 'present'
-              AND CONCAT(cs.session_date, ' ', cs.end_time) < NOW()
+              AND cs.status IN ('completed', 'active')
         ");
         $stmtPres->execute([$courseId, $studentId]);
         $present = (int)$stmtPres->fetchColumn();
@@ -39,7 +39,7 @@ class AttendanceStatsHelper {
             FROM attendance_records ar
             JOIN class_sessions cs ON ar.session_id = cs.id
             WHERE cs.course_id = ? AND ar.student_id = ? AND ar.status = 'late'
-              AND CONCAT(cs.session_date, ' ', cs.end_time) < NOW()
+              AND cs.status IN ('completed', 'active')
         ");
         $stmtLate->execute([$courseId, $studentId]);
         $late = (int)$stmtLate->fetchColumn();

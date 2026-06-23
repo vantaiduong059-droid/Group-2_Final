@@ -2,321 +2,266 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title><?= isset($title) ? htmlspecialchars($title) : 'Sinh viên' ?> - EduManager</title>
-    <meta name="description" content="Cổng sinh viên EduManager - Theo dõi chuyên cần và tương tác lớp học">
-
-    <!-- PWA Meta Tags -->
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="EduManager">
-    <meta name="theme-color" content="#3b82f6">
-    <meta name="msapplication-TileColor" content="#3b82f6">
-
-    <!-- PWA Manifest & Icons -->
-    <link rel="manifest" href="<?= BASE_URL ?>/manifest.json">
-    <link rel="apple-touch-icon" href="<?= BASE_URL ?>/assets/images/icon-192.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="<?= BASE_URL ?>/assets/images/icon-192.png">
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= isset($title) ? $title : 'Sinh viên' ?> - EduManager</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
     <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/style.css?v=<?= time() ?>">
-
-    <style>
-    /* Mobile Bottom Navigation */
-    #mobileBottomNav {
-        display: none;
-        position: fixed;
-        bottom: 0; left: 0; right: 0;
-        background: #fff;
-        border-top: 1px solid #e5e7eb;
-        z-index: 1050;
-        padding-bottom: env(safe-area-inset-bottom, 0);
-        box-shadow: 0 -2px 10px rgba(0,0,0,0.08);
-    }
-    #mobileBottomNav a {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 10px 4px 8px;
-        text-decoration: none;
-        color: #6b7280;
-        font-size: 0.65rem;
-        font-weight: 500;
-        transition: color 0.2s;
-    }
-    #mobileBottomNav a.active, #mobileBottomNav a:hover { color: #3b82f6; }
-    #mobileBottomNav a i { font-size: 1.4rem; margin-bottom: 2px; }
-    /* Install banner */
-    #pwaInstallBanner {
-        display: none;
-        position: fixed;
-        bottom: 70px; left: 12px; right: 12px;
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        color: #fff;
-        border-radius: 14px;
-        padding: 14px 18px;
-        z-index: 1060;
-        box-shadow: 0 8px 24px rgba(59,130,246,0.4);
-        align-items: center;
-        gap: 12px;
-    }
-    @media (max-width: 767.98px) {
-        #mobileBottomNav { display: flex !important; }
-        #page-content-wrapper { padding-bottom: 70px !important; }
-        #sidebar-wrapper { display: none !important; }
-        #wrapper { display: block !important; }
-    }
-    </style>
 </head>
 <body>
 
-<div class="d-flex" id="wrapper">
+<?php 
+$noSidebar = isset($noSidebar) ? $noSidebar : (preg_match('/\/student\/dashboard/', $_SERVER['REQUEST_URI'])); 
+$avatarUrl = $_SESSION['user']['avatar_url'] ?? null;
+$initials = urlencode($_SESSION['user']['full_name'] ?? 'SV');
+$avatarSrc = $avatarUrl ?: "https://ui-avatars.com/api/?name={$initials}&background=6366f1&color=fff";
+?>
+<div class="d-flex <?= $noSidebar ? 'no-sidebar' : '' ?>" id="wrapper">
     <!-- Sidebar -->
     <div id="sidebar-wrapper">
         <div class="sidebar-heading">
             <div class="d-flex align-items-center gap-2">
-                <div class="bg-primary text-white rounded p-2 d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-                    <i class="bi bi-mortarboard-fill fs-6" style="background:none; padding:0; color:white;"></i>
+                <div class="text-white rounded p-2 d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:#6366f1;">
+                    <i class="bi bi-mortarboard-fill fs-6" style="color:white;"></i>
                 </div>
                 <div>
                     <div class="fw-bold fs-5 text-dark" style="line-height:1.2;">EduManager</div>
-                    <div class="small text-muted" style="font-size: 0.7rem; font-weight: 500;">Cổng Sinh Viên</div>
+                    <div class="small text-muted" style="font-size:0.7rem;font-weight:500;">Cổng Sinh Viên</div>
                 </div>
             </div>
         </div>
-
         <div class="list-group list-group-flush mt-3">
-            <?php
-            $currentPath = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-            $isActive = function($path) use ($currentPath) {
-                return strpos($currentPath, $path) !== false ? 'active' : '';
-            };
-            ?>
-            <a href="<?= BASE_URL ?>/student/dashboard" class="list-group-item list-group-item-action <?= $isActive('/student/dashboard') ?>">
-                <i class="bi bi-person-badge me-2"></i> Chuyên cần &amp; Tương tác
+            <a href="<?= BASE_URL ?>/student/dashboard" class="list-group-item list-group-item-action <?= (preg_match('/\/student\/dashboard/', $_SERVER['REQUEST_URI'])) ? 'active' : '' ?>">
+                <i class="bi bi-house-door"></i> Trang chủ
             </a>
-            <a href="<?= BASE_URL ?>/student/schedule" class="list-group-item list-group-item-action <?= $isActive('/student/schedule') ?>">
-                <i class="bi bi-calendar-week me-2"></i> Lịch học
+            <a href="<?= BASE_URL ?>/student/schedule" class="list-group-item list-group-item-action <?= (strpos($_SERVER['REQUEST_URI'], 'schedule') !== false) ? 'active' : '' ?>">
+                <i class="bi bi-calendar3"></i> Lịch học
             </a>
-            <a href="<?= BASE_URL ?>/student/my-courses" class="list-group-item list-group-item-action <?= $isActive('/student/my-courses') ?>">
-                <i class="bi bi-journal-bookmark me-2"></i> Học phần của tôi
+            <a href="<?= BASE_URL ?>/student/attendance" class="list-group-item list-group-item-action <?= (strpos($_SERVER['REQUEST_URI'], 'attendance') !== false) ? 'active' : '' ?>">
+                <i class="bi bi-qr-code-scan"></i> Điểm danh
             </a>
-            <a href="<?= BASE_URL ?>/student/profile" class="list-group-item list-group-item-action <?= $isActive('/student/profile') ?>">
-                <i class="bi bi-person-circle me-2"></i> Hồ sơ cá nhân
+            <a href="<?= BASE_URL ?>/student/quiz" class="list-group-item list-group-item-action <?= (strpos($_SERVER['REQUEST_URI'], 'quiz') !== false) ? 'active' : '' ?>">
+                <i class="bi bi-patch-question"></i> Quiz & Thảo luận
             </a>
-        </div>
-
-        <!-- User Profile Bottom -->
-        <div class="sidebar-footer">
-            <div class="sidebar-profile">
-                <a href="<?= BASE_URL ?>/student/profile" title="Hồ sơ cá nhân">
-                    <img src="https://ui-avatars.com/api/?name=<?= urlencode($_SESSION['user']['full_name']) ?>&background=3b82f6&color=fff&bold=true" alt="Avatar">
-                </a>
-                <div class="sidebar-profile-info w-100 d-flex justify-content-between align-items-center">
-                    <div>
-                        <div class="sidebar-profile-name" style="max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></div>
-                        <div class="sidebar-profile-role">Sinh viên</div>
-                    </div>
-                    <a href="<?= BASE_URL ?>/logout" class="text-muted" title="Đăng xuất"><i class="bi bi-box-arrow-right"></i></a>
-                </div>
-            </div>
+            <a href="<?= BASE_URL ?>/student/history" class="list-group-item list-group-item-action <?= (strpos($_SERVER['REQUEST_URI'], 'history') !== false) ? 'active' : '' ?>">
+                <i class="bi bi-clock-history"></i> Lịch sử & Thống kê
+            </a>
         </div>
     </div>
 
-    <!-- Page Content -->
     <div id="page-content-wrapper">
         <nav class="navbar navbar-expand-lg">
             <div class="container-fluid px-4 py-2">
-                <button class="btn btn-light d-md-none me-3" id="sidebarToggle"><i class="bi bi-list fs-4"></i></button>
-            <div class="ms-auto d-flex align-items-center gap-3 topbar-actions">
-                    <div class="btn btn-light rounded-pill px-3 py-2 fw-medium text-muted d-flex align-items-center gap-2" style="border: 1px solid var(--border-color-darker); font-size: 0.9rem;">
-                        <i class="bi bi-calendar-event text-primary"></i> Học kỳ II (2025 - 2026)
-                    </div>
-                    <!-- Chuông thông báo -->
-                    <div class="position-relative" id="notifBellWrapper">
-                        <button class="btn btn-light rounded-circle p-2" id="btnNotifBell" title="Thông báo" style="width:40px;height:40px;border:1px solid var(--border-color-darker);">
-                            <i class="bi bi-bell fs-6"></i>
-                        </button>
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none" id="notifBadge" style="font-size:0.65rem;">0</span>
-                        <!-- Dropdown thông báo -->
-                        <div class="card shadow-lg border-0 d-none" id="notifDropdown" style="position:absolute;right:0;top:48px;width:320px;z-index:9999;border-radius:12px;max-height:400px;overflow-y:auto;">
-                            <div class="card-header d-flex justify-content-between align-items-center py-2 px-3" style="background:var(--bg-card,#fff);border-bottom:1px solid var(--border-color,#e5e7eb);">
-                                <span class="fw-bold small">Thông báo</span>
-                                <button class="btn btn-link btn-sm text-muted p-0" id="btnMarkAllRead">Đã đọc tất cả</button>
-                            </div>
-                            <div id="notifList" class="py-1"></div>
+                <?php if ($noSidebar): ?>
+                    <!-- Logo khi không có Sidebar (Dashboard) -->
+                    <a class="navbar-brand d-flex align-items-center gap-2 me-3" href="<?= BASE_URL ?>/student/dashboard">
+                        <div class="text-white rounded p-2 d-flex align-items-center justify-content-center" style="width:32px;height:32px;background:#6366f1;">
+                            <i class="bi bi-mortarboard-fill fs-6" style="color:white;"></i>
                         </div>
+                        <span class="fw-bold fs-5 text-dark" style="line-height:1.2;">EduManager</span>
+                    </a>
+                <?php endif; ?>
+                
+                <!-- Nút Hamburger Menu luôn hiển thị cạnh nút Trang chủ -->
+                <button class="btn btn-light me-2" id="sidebarToggle" title="Ẩn/Hiện Menu"><i class="bi bi-list fs-4"></i></button>
+                
+                <a href="<?= BASE_URL ?>/student/dashboard" class="btn btn-light me-3" title="Trang chủ">
+                    <i class="bi bi-house-door-fill"></i>
+                </a>
+                
+                <div class="ms-auto d-flex align-items-center gap-3 topbar-actions">
+                    <!-- Dropdown học kỳ đồng bộ -->
+                    <div class="dropdown" id="semesterDropdown">
+                        <button class="btn btn-light rounded-pill px-3 py-2 fw-medium text-muted d-flex align-items-center gap-2 border" data-bs-toggle="dropdown" aria-expanded="false" style="font-size: 0.9rem;">
+                            <i class="bi bi-calendar-event text-success"></i>
+                            <span id="currentSemesterText">Học kỳ hè (2025-2026)</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item active" href="#" data-semester="summer">Học kỳ hè (2025-2026)</a></li>
+                            <li><a class="dropdown-item" href="#" data-semester="semester1">Học kỳ 1 (2025-2026)</a></li>
+                            <li><a class="dropdown-item" href="#" data-semester="semester2">Học kỳ 2 (2025-2026)</a></li>
+                        </ul>
+                    </div>
+
+                    <!-- Chuông thông báo Dropdown -->
+                    <div class="dropdown" id="notificationDropdown">
+                        <button class="btn-icon position-relative dropdown-toggle-custom" data-bs-toggle="dropdown" aria-expanded="false" id="notifBtn" title="Thông báo">
+                            <i class="bi bi-bell"></i>
+                            <span class="notif-badge" id="notifBadge" style="display:none;position:absolute;top:-4px;right:-4px;background:#ef4444;color:white;border-radius:50%;font-size:0.65rem;width:16px;height:16px;align-items:center;justify-content:center;font-weight:700;z-index: 10;">0</span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-0 shadow border-0" style="width: 320px; border-radius: 12px; overflow: hidden; max-height: 400px; z-index: 1050;">
+                            <div class="p-3 border-bottom d-flex justify-content-between align-items-center bg-light">
+                                <h6 class="fw-bold mb-0" style="font-size: 0.9rem;">Thông báo</h6>
+                                <span class="badge bg-primary-subtle text-primary" id="notifUnreadCount">0 mới</span>
+                            </div>
+                            <div id="notifListContainer" style="max-height: 280px; overflow-y: auto;">
+                                <div class="text-center py-4 text-muted small">Không có thông báo nào.</div>
+                            </div>
+                            <div class="p-2 border-top text-center bg-light">
+                                <a href="<?= BASE_URL ?>/student/notifications" class="text-decoration-none small fw-semibold text-primary">Xem tất cả</a>
+                            </div>
+                        </ul>
+                    </div>
+
+                    <!-- Avatar + Tên click mở dropdown -->
+                    <div class="dropdown">
+                        <a href="#" class="d-flex align-items-center text-decoration-none gap-2 dropdown-toggle-custom" data-bs-toggle="dropdown" aria-expanded="false">
+                            <img src="<?= htmlspecialchars($avatarSrc) ?>" alt="Avatar" style="width:32px;height:32px;border-radius:50%;object-fit:cover;">
+                            <span class="d-none d-md-inline text-dark fw-medium" style="font-size: 0.9rem;"><?= htmlspecialchars($_SESSION['user']['full_name']) ?></span>
+                            <i class="bi bi-chevron-down text-muted small d-none d-md-inline"></i>
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="<?= BASE_URL ?>/student/profile"><i class="bi bi-person-circle me-2"></i>Thông tin cá nhân</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="<?= BASE_URL ?>/logout"><i class="bi bi-box-arrow-right me-2"></i>Đăng xuất</a></li>
+                        </ul>
                     </div>
                 </div>
             </div>
         </nav>
-
         <div class="container-fluid px-4 py-4">
             <?= $content ?>
         </div>
     </div>
 </div>
 
-<!-- Toast Container -->
 <div class="toast-container position-fixed bottom-0 end-0 p-3"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
     const BASE_URL = '<?= BASE_URL ?>';
+    
+    // Toggle Sidebar
     const toggleBtn = document.getElementById('sidebarToggle');
-    if (toggleBtn) {
-        toggleBtn.addEventListener('click', function() {
-            document.getElementById('wrapper').classList.toggle('toggled');
+    const wrapper = document.getElementById('wrapper');
+    if (toggleBtn && wrapper) {
+        toggleBtn.addEventListener('click', () => {
+            const isDashboard = window.location.pathname.includes('/student/dashboard');
+            if (isDashboard) {
+                if (wrapper.classList.contains('no-sidebar')) {
+                    wrapper.classList.remove('no-sidebar');
+                    if (window.innerWidth < 768) {
+                        wrapper.classList.add('toggled');
+                    }
+                } else {
+                    wrapper.classList.add('no-sidebar');
+                    wrapper.classList.remove('toggled');
+                }
+            } else {
+                wrapper.classList.toggle('toggled');
+            }
         });
     }
 
-    // Thông báo (Notification Bell)
-    (function initNotifications() {
-        const bell = document.getElementById('btnNotifBell');
-        const badge = document.getElementById('notifBadge');
-        const dropdown = document.getElementById('notifDropdown');
-        const notifList = document.getElementById('notifList');
-        const markAllBtn = document.getElementById('btnMarkAllRead');
-        if (!bell) return;
-
-        function loadNotifications() {
-            fetch(BASE_URL + '/api/notifications?limit=10')
-                .then(r => r.json())
-                .then(res => {
-                    if (res.status !== 'success') return;
-                    const count = res.unread_count || 0;
-                    if (count > 0) {
-                        badge.innerText = count > 9 ? '9+' : count;
-                        badge.classList.remove('d-none');
-                    } else {
-                        badge.classList.add('d-none');
-                    }
-                    renderNotifList(res.data || []);
-                }).catch(() => {});
+    // Sync Học kỳ bằng localStorage
+    const savedSem = localStorage.getItem('selected_semester') || 'summer';
+    const semMap = {
+        'summer': 'Học kỳ hè (2025-2026)',
+        'semester1': 'Học kỳ 1 (2025-2026)',
+        'semester2': 'Học kỳ 2 (2025-2026)'
+    };
+    const currentSemText = document.getElementById('currentSemesterText');
+    if (currentSemText && semMap[savedSem]) {
+        currentSemText.textContent = semMap[savedSem];
+    }
+    const dropdownItems = document.querySelectorAll('#semesterDropdown .dropdown-item');
+    dropdownItems.forEach(item => {
+        if (item.getAttribute('data-semester') === savedSem) {
+            item.classList.add('active');
+        } else {
+            item.classList.remove('active');
         }
-
-        function renderNotifList(items) {
-            notifList.innerHTML = '';
-            if (!items.length) {
-                notifList.innerHTML = '<div class="text-center text-muted small py-3">Không có thông báo nào</div>';
-                return;
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const sem = item.getAttribute('data-semester');
+            localStorage.setItem('selected_semester', sem);
+            if (currentSemText && semMap[sem]) {
+                currentSemText.textContent = semMap[sem];
             }
-            items.forEach(n => {
-                const div = document.createElement('div');
-                div.className = 'px-3 py-2 border-bottom ' + (n.is_read == 0 ? 'bg-primary-subtle' : '');
-                div.style.cursor = n.link ? 'pointer' : 'default';
-                div.innerHTML = `
-                    <div class="d-flex gap-2 align-items-start">
-                        <div class="${n.is_read == 0 ? 'text-primary' : 'text-muted'} mt-1"><i class="bi bi-bell-fill small"></i></div>
-                        <div>
-                            <div class="fw-semibold small" style="font-size:0.82rem;">${n.title || 'Thông báo'}</div>
-                            <div class="text-muted" style="font-size:0.78rem;">${n.message || ''}</div>
-                        </div>
-                    </div>`;
-                if (n.link) div.onclick = () => window.location.href = n.link;
-                notifList.appendChild(div);
-            });
-        }
-
-        bell.addEventListener('click', function(e) {
-            e.stopPropagation();
-            dropdown.classList.toggle('d-none');
-            loadNotifications();
+            dropdownItems.forEach(i => i.classList.remove('active'));
+            item.classList.add('active');
+            window.dispatchEvent(new Event('semesterChanged'));
         });
+    });
 
-        document.addEventListener('click', function() {
-            dropdown.classList.add('d-none');
-        });
+    // AJAX Chuông thông báo
+    function loadNotifications() {
+        fetch(`${BASE_URL}/api/notifications?limit=10`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    const count = res.unread_count || 0;
+                    const badge = document.getElementById('notifBadge');
+                    const unreadText = document.getElementById('notifUnreadCount');
+                    
+                    if (badge) {
+                        if (count > 0) {
+                            badge.textContent = count;
+                            badge.style.display = 'flex';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    }
+                    
+                    if (unreadText) {
+                        unreadText.textContent = `${count} mới`;
+                    }
 
-        dropdown.addEventListener('click', e => e.stopPropagation());
+                    // Render dropdown list
+                    const container = document.getElementById('notifListContainer');
+                    if (container) {
+                        const list = res.data || [];
+                        if (list.length === 0) {
+                            container.innerHTML = '<div class="text-center py-4 text-muted small">Không có thông báo nào.</div>';
+                        } else {
+                            container.innerHTML = list.map(n => {
+                                const unreadStyle = n.is_read == 0 ? 'background-color: rgba(99, 102, 241, 0.04); font-weight: 500;' : '';
+                                const dateStr = new Date(n.created_at).toLocaleDateString('vi-VN', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                                const link = n.link || '#';
+                                return `
+                                    <div class="px-3 py-2 border-bottom notif-dropdown-item" style="${unreadStyle} cursor:pointer;" onclick="location.href='${BASE_URL}${link}'">
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <span class="fw-bold small text-dark">${n.title}</span>
+                                            <span class="text-muted" style="font-size:0.65rem;">${dateStr}</span>
+                                        </div>
+                                        <div class="text-muted small text-truncate" style="font-size:0.75rem;">${n.message}</div>
+                                    </div>
+                                `;
+                              }).join('');
+                          }
+                      }
+                  }
+              })
+              .catch(err => console.error('Lỗi tải thông báo:', err));
+      }
 
-        markAllBtn && markAllBtn.addEventListener('click', function() {
-            fetch(BASE_URL + '/api/notifications/mark-read', { method: 'POST' })
-                .then(r => r.json()).then(() => { badge.classList.add('d-none'); loadNotifications(); });
-        });
+      // Đánh dấu đã đọc khi click mở chuông
+      const notifBtn = document.getElementById('notifBtn');
+      if (notifBtn) {
+          notifBtn.addEventListener('click', () => {
+              // Gọi API đọc
+              fetch(`${BASE_URL}/api/notifications/read`, { method: 'POST' })
+                  .then(r => r.json())
+                  .then(res => {
+                      if (res.status === 'success') {
+                          const badge = document.getElementById('notifBadge');
+                          if (badge) badge.style.display = 'none';
+                          const unreadText = document.getElementById('notifUnreadCount');
+                          if (unreadText) unreadText.textContent = '0 mới';
+                      }
+                  })
+                  .catch(err => console.error(err));
+          });
+      }
 
-        // Load lần đầu
-        loadNotifications();
-    })();
+      // Khởi tạo chạy lần đầu và định kỳ 60 giây
+      loadNotifications();
+      setInterval(loadNotifications, 60000);
 </script>
 <script src="<?= BASE_URL ?>/assets/js/main.js"></script>
-<?php if (isset($extraJs)) echo $extraJs; ?>
-
-<!-- Mobile Bottom Navigation -->
-<nav id="mobileBottomNav">
-    <?php
-    $currentPath = $_SERVER['REQUEST_URI'] ?? '';
-    $navItems = [
-        ['url' => BASE_URL.'/student/dashboard', 'icon' => 'bi-person-badge', 'label' => 'Tương tác', 'match' => '/student/dashboard'],
-        ['url' => BASE_URL.'/student/schedule',  'icon' => 'bi-calendar-week','label' => 'Lịch học',   'match' => '/student/schedule'],
-        ['url' => BASE_URL.'/student/my-courses','icon' => 'bi-journal-bookmark','label' => 'Học phần', 'match' => '/student/my-courses'],
-        ['url' => BASE_URL.'/student/profile',   'icon' => 'bi-person-circle', 'label' => 'Hồ sơ',    'match' => '/student/profile'],
-    ];
-    foreach ($navItems as $nav):
-        $active = strpos($currentPath, $nav['match']) !== false ? 'active' : '';
-    ?>
-    <a href="<?= $nav['url'] ?>" class="<?= $active ?>">
-        <i class="bi <?= $nav['icon'] ?>"></i>
-        <?= $nav['label'] ?>
-    </a>
-    <?php endforeach; ?>
-</nav>
-
-<!-- PWA Install Banner -->
-<div id="pwaInstallBanner">
-    <img src="<?= BASE_URL ?>/assets/images/icon-192.png" alt="" style="width:40px;height:40px;border-radius:10px;flex-shrink:0;">
-    <div style="flex:1;">
-        <div style="font-size:0.9rem;font-weight:700;">Cài EduManager lên điện thoại</div>
-        <div style="font-size:0.75rem;opacity:0.85;">Theo dõi lịch học mọi lúc mọi nơi</div>
-    </div>
-    <button id="btnInstallPwa" style="background:#fff;color:#3b82f6;border:none;border-radius:20px;padding:6px 14px;font-size:0.8rem;font-weight:700;cursor:pointer;flex-shrink:0;">Cài</button>
-    <button onclick="document.getElementById('pwaInstallBanner').style.display='none'" style="background:transparent;border:none;color:#fff;font-size:1.1rem;cursor:pointer;flex-shrink:0;">×</button>
-</div>
-
-<script>
-// Service Worker Registration
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('<?= BASE_URL ?>/sw.js')
-            .then(reg => console.log('[PWA] SW registered:', reg.scope))
-            .catch(err => console.warn('[PWA] SW registration failed:', err));
-    });
-}
-
-// PWA Install Prompt
-let deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    const banner = document.getElementById('pwaInstallBanner');
-    if (banner) banner.style.display = 'flex';
-});
-
-const btnInstall = document.getElementById('btnInstallPwa');
-if (btnInstall) {
-    btnInstall.addEventListener('click', async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        deferredPrompt = null;
-        document.getElementById('pwaInstallBanner').style.display = 'none';
-        if (outcome === 'accepted') {
-            console.log('[PWA] App installed!');
-        }
-    });
-}
-
-window.addEventListener('appinstalled', () => {
-    const banner = document.getElementById('pwaInstallBanner');
-    if (banner) banner.style.display = 'none';
-    console.log('[PWA] App installed successfully!');
-});
-</script>
+<?php if(isset($extraJs)) echo $extraJs; ?>
 </body>
 </html>

@@ -1,5 +1,38 @@
-.idea/
-.vscode/
+# =============================================
+# .gitignore cho project PHP/XAMPP
+# =============================================
+
+# --- KHÔNG NỘP: File cấu hình chứa thông tin nhạy cảm ---
+# (Nếu muốn nộp thì tạo file config.example.php thay thế)
+# config/config.php
+
+# --- KHÔNG NỘP: Thư mục ảnh/avatar upload của người dùng ---
+public/assets/images/avatars/
+public/assets/images/uploads/
+
+# --- KHÔNG NỘP: File log ---
 *.log
+logs/
+error_log
+
+# --- KHÔNG NỘP: File tạm / debug / test ---
+generate_large_data.php
+restore_db.php
+migrate_old.php
+*.bak
+*.tmp
+*.swp
+
+# --- KHÔNG NỘP: File hệ thống OS ---
 .DS_Store
-Ke_hoach_He_thong_Diem_danh_Sinh_vien.pdf
+Thumbs.db
+desktop.ini
+
+# --- KHÔNG NỘP: IDE / Editor config cá nhân ---
+.vscode/
+.idea/
+*.code-workspace
+.agents/
+
+# --- KHÔNG NỘP: Thư mục git nội bộ (tự động bỏ qua) ---
+# .git/ (git tự bỏ, không cần ghi)

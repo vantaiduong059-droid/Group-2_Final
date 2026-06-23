@@ -88,8 +88,6 @@ class QuizApiController extends Controller {
         
         // Điểm số ngẫu nhiên hoặc do sinh viên nộp (đáp án đúng)
         // Trong đồ án mẫu, ta cho phép truyền điểm trực tiếp hoặc giả lập điểm thi
-        $score = isset($data['score']) ? floatval($data['score']) : rand(5, 10);
-
         $quiz = $this->quizRepo->getById($quizId);
         if (!$quiz) {
             $this->jsonResponse(['status' => 'error', 'message' => 'Không tìm thấy bài Quiz.'], 404);
@@ -98,6 +96,25 @@ class QuizApiController extends Controller {
         // Kiểm tra thời gian hết hạn quiz
         if (strtotime($quiz['end_time']) < time()) {
             $this->jsonResponse(['status' => 'error', 'message' => 'Bài Quiz đã hết hạn nộp bài.'], 400);
+        }
+
+        // Tính điểm số thật của SV dựa trên đáp án đúng
+        $answers = $data['answers'] ?? [];
+        $questions = $this->quizRepo->getQuestionsByQuiz($quizId);
+        $totalQuestions = count($questions);
+
+        if ($totalQuestions > 0) {
+            $correctCount = 0;
+            foreach ($questions as $q) {
+                $qId = $q['id'];
+                $studentAns = $answers[$qId] ?? null;
+                if ($studentAns !== null && strtoupper(trim($studentAns)) === strtoupper(trim($q['correct_option']))) {
+                    $correctCount++;
+                }
+            }
+            $score = round(($correctCount / $totalQuestions) * 10, 2);
+        } else {
+            $score = 0.0;
         }
 
         try {

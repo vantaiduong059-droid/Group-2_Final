@@ -6,7 +6,7 @@ class SessionRepository extends BaseRepository {
     
     public function getAllSessions() {
         $stmt = $this->model->db->prepare("
-            SELECT cs.*, c.name as course_name, c.code as course_code, c.class_code as course_class_code, u.full_name as teacher_name
+            SELECT cs.*, c.name as course_name, c.code as course_code, c.class_code as course_class_code, u.full_name as teacher_name, u.email as teacher_email
             FROM {$this->model->table} cs 
             JOIN courses c ON cs.course_id = c.id
             LEFT JOIN users u ON c.teacher_id = u.id AND u.role = 'teacher'
@@ -43,5 +43,43 @@ class SessionRepository extends BaseRepository {
             'note' => isset($data['note']) ? $data['note'] : '',
             'id' => $id
         ]);
+    }
+
+    public function getSessionDetails($id) {
+        $stmt = $this->model->db->prepare("
+            SELECT cs.*, c.name as course_name, c.code as course_code, c.class_code as course_class_code, u.full_name as teacher_name, u.email as teacher_email
+            FROM {$this->model->table} cs 
+            JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN users u ON c.teacher_id = u.id AND u.role = 'teacher'
+            WHERE cs.id = ?
+        ");
+        $stmt->execute([$id]);
+        return $stmt->fetch();
+    }
+
+    public function getById($id) {
+        return $this->getSessionDetails($id);
+    }
+
+    public function getSessionsByDateRange($start, $end, $courseId = null) {
+        $sql = "
+            SELECT cs.*, c.name as course_name, c.code as course_code, c.class_code as course_class_code,
+                   u.full_name as teacher_name, u.email as teacher_email, c.teacher_id
+            FROM {$this->model->table} cs 
+            JOIN courses c ON cs.course_id = c.id
+            LEFT JOIN users u ON c.teacher_id = u.id AND u.role = 'teacher'
+            WHERE cs.session_date BETWEEN :start AND :end
+        ";
+        $params = ['start' => $start, 'end' => $end];
+
+        if ($courseId) {
+            $sql .= " AND cs.course_id = :course_id";
+            $params['course_id'] = $courseId;
+        }
+
+        $sql .= " ORDER BY cs.session_date ASC, cs.start_time ASC";
+        $stmt = $this->model->db->prepare($sql);
+        $stmt->execute($params);
+        return $stmt->fetchAll();
     }
 }

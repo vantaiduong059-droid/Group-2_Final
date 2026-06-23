@@ -287,10 +287,7 @@
     </div>
 </div>
 
-<script>
-    // Định nghĩa biến để JS gọi AJAX
-    let currentQuizId = null;
-</script>
+
 
 <?php 
 // Nạp file JS xử lý CRUD tương ứng

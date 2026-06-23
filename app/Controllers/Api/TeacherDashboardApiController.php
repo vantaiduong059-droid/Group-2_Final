@@ -205,7 +205,7 @@ class TeacherDashboardApiController extends Controller {
                 FROM courses c
                 JOIN class_sessions cs ON c.id = cs.course_id
                 LEFT JOIN attendance_records ar ON cs.id = ar.session_id
-                WHERE c.teacher_id = ? AND cs.status = 'completed'
+                WHERE c.teacher_id = ? AND CONCAT(cs.session_date, ' ', cs.end_time) < NOW()
                 GROUP BY c.id
             ");
             $stmtChartAttendance->execute([$teacherId]);
@@ -218,7 +218,7 @@ class TeacherDashboardApiController extends Controller {
                 FROM class_sessions cs
                 JOIN courses c ON cs.course_id = c.id
                 LEFT JOIN attendance_records ar ON cs.id = ar.session_id
-                WHERE c.teacher_id = ? AND cs.status = 'completed'
+                WHERE c.teacher_id = ? AND CONCAT(cs.session_date, ' ', cs.end_time) < NOW()
                 GROUP BY cs.id
                 ORDER BY cs.session_date DESC, cs.start_time DESC
                 LIMIT 10
@@ -228,7 +228,25 @@ class TeacherDashboardApiController extends Controller {
 
             // 15. Biểu đồ 3: CPI trung bình theo thời gian
             $chartCpiData = [];
-            if ($passedSessionsCount === 0) {
+            
+            // Lấy configs hệ thống trước
+            $stmtConfig = $db->prepare("SELECT config_key, config_value FROM system_configs");
+            $stmtConfig->execute();
+            $sysConfigs = $stmtConfig->fetchAll(PDO::FETCH_KEY_PAIR);
+            
+            $stmtMyCourses = $db->prepare("SELECT id FROM courses WHERE teacher_id = ?");
+            $stmtMyCourses->execute([$teacherId]);
+            $myCourseIds = $stmtMyCourses->fetchAll(PDO::FETCH_COLUMN);
+            
+            $allCourseTrends = [];
+            foreach ($myCourseIds as $cid) {
+                $trends = $this->getCourseCpiTrends($db, $cid, $sysConfigs);
+                if (!empty($trends)) {
+                    $allCourseTrends[$cid] = $trends;
+                }
+            }
+            
+            if (empty($allCourseTrends)) {
                 // Tạo danh sách 8 ngày gần đây nhưng giá trị CPI đều là null để không vẽ đường giả
                 $cpiDates = [];
                 for ($i = 7; $i >= 0; $i--) {
@@ -241,30 +259,43 @@ class TeacherDashboardApiController extends Controller {
                     ];
                 }
             } else {
-                $stmtChartCpiDates = $db->prepare("
-                    SELECT DISTINCT cs.session_date
-                    FROM class_sessions cs
-                    JOIN courses c ON cs.course_id = c.id
-                    WHERE c.teacher_id = ? AND cs.status = 'completed'
-                    ORDER BY cs.session_date DESC
-                    LIMIT 8
-                ");
-                $stmtChartCpiDates->execute([$teacherId]);
-                $cpiDates = array_reverse($stmtChartCpiDates->fetchAll(PDO::FETCH_COLUMN));
-
-                if (empty($cpiDates)) {
-                    for ($i = 7; $i >= 0; $i--) {
-                        $cpiDates[] = date('Y-m-d', strtotime("-$i days"));
+                // Gom tất cả các ngày có buổi học completed
+                $dates = [];
+                foreach ($allCourseTrends as $cid => $trends) {
+                    foreach ($trends as $t) {
+                        $dates[] = $t['date'];
                     }
                 }
-
-                $baseCpi = ($avgCpi !== null && $avgCpi > 0) ? $avgCpi : 75.0;
-                $countDates = count($cpiDates);
-                for ($i = 0; $i < $countDates; $i++) {
-                    $offset = ($countDates - 1 - $i) * 1.5 - (rand(0, 100) / 100.0);
-                    $val = max(0, min(100, round($baseCpi - $offset, 1)));
+                $dates = array_unique($dates);
+                sort($dates);
+                
+                // Lấy 8 điểm dữ liệu gần đây nhất (hoặc tất cả nếu ít hơn 8)
+                if (count($dates) > 8) {
+                    $dates = array_slice($dates, -8);
+                }
+                
+                foreach ($dates as $date) {
+                    $cpiSum = 0;
+                    $cpiCount = 0;
+                    
+                    foreach ($allCourseTrends as $cid => $trends) {
+                        $lastCpi = null;
+                        foreach ($trends as $t) {
+                            if ($t['date'] <= $date) {
+                                $lastCpi = $t['avg_cpi'];
+                            } else {
+                                break;
+                            }
+                        }
+                        if ($lastCpi !== null) {
+                            $cpiSum += $lastCpi;
+                            $cpiCount++;
+                        }
+                    }
+                    
+                    $val = $cpiCount > 0 ? round($cpiSum / $cpiCount, 1) : null;
                     $chartCpiData[] = [
-                        'date' => $cpiDates[$i],
+                        'date' => $date,
                         'avg_cpi' => $val
                     ];
                 }
@@ -314,5 +345,162 @@ class TeacherDashboardApiController extends Controller {
                 'message' => 'Lỗi truy vấn cơ sở dữ liệu: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Tính toán xu hướng CPI tích lũy của một khóa học qua các buổi học đã hoàn thành
+     */
+    private function getCourseCpiTrends($db, $courseId, $sysConfigs) {
+        // 1. Lấy cấu hình môn học
+        $stmt = $db->prepare("SELECT * FROM courses WHERE id = ?");
+        $stmt->execute([$courseId]);
+        $course = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$course) return [];
+        
+        $pPts = (int)($course['rule_present_points'] ?? $sysConfigs['default_rule_present_points'] ?? 2);
+        $lPts = (int)($course['rule_late_points'] ?? $sysConfigs['default_rule_late_points'] ?? 1);
+        $aPts = (int)($course['rule_absent_points'] ?? $sysConfigs['default_rule_absent_points'] ?? 0);
+        $iPtsRule = (int)($course['rule_interaction_points'] ?? $sysConfigs['default_rule_interaction_points'] ?? 1);
+        $attWeight = (int)($course['rule_attendance_weight'] ?? $sysConfigs['default_rule_attendance_weight'] ?? 50);
+        $quizWeight = (int)($course['rule_quiz_weight'] ?? $sysConfigs['default_rule_quiz_weight'] ?? 50);
+
+        // 2. Lấy danh sách SV
+        $stmtStuds = $db->prepare("SELECT student_id FROM course_students WHERE course_id = ?");
+        $stmtStuds->execute([$courseId]);
+        $studentIds = $stmtStuds->fetchAll(PDO::FETCH_COLUMN);
+        if (empty($studentIds)) return [];
+
+        // 3. Lấy danh sách các buổi học đã diễn ra sắp xếp tăng dần theo thời gian
+        $stmtSessions = $db->prepare("
+            SELECT id, session_date 
+            FROM class_sessions 
+            WHERE course_id = ? AND CONCAT(session_date, ' ', end_time) < NOW()
+            ORDER BY session_date ASC, start_time ASC
+        ");
+        $stmtSessions->execute([$courseId]);
+        $sessions = $stmtSessions->fetchAll(PDO::FETCH_ASSOC);
+        if (empty($sessions)) return [];
+
+        // 4. Lấy tất cả attendance records của các session completed này
+        $sessionIds = array_column($sessions, 'id');
+        $inClause = implode(',', array_fill(0, count($sessionIds), '?'));
+        
+        $stmtAtt = $db->prepare("
+            SELECT session_id, student_id, status 
+            FROM attendance_records 
+            WHERE session_id IN ($inClause)
+        ");
+        $stmtAtt->execute($sessionIds);
+        $attRows = $stmtAtt->fetchAll(PDO::FETCH_ASSOC);
+        $attRecords = [];
+        foreach ($attRows as $r) {
+            $attRecords[$r['session_id']][$r['student_id']] = $r['status'];
+        }
+
+        // 5. Lấy tất cả quiz submissions và total marks của quiz
+        $stmtQuiz = $db->prepare("
+            SELECT qz.session_id, qs.student_id, qs.score, qz.total_marks
+            FROM quiz_submissions qs
+            JOIN quiz_sessions qz ON qs.quiz_id = qz.id
+            WHERE qz.session_id IN ($inClause)
+        ");
+        $stmtQuiz->execute($sessionIds);
+        $quizSubmissions = $stmtQuiz->fetchAll(PDO::FETCH_ASSOC);
+        $quizData = [];
+        foreach ($quizSubmissions as $q) {
+            $quizData[$q['session_id']][$q['student_id']][] = [
+                'score' => (float)$q['score'],
+                'total_marks' => (float)$q['total_marks']
+            ];
+        }
+
+        // 6. Lấy tất cả interaction logs
+        $stmtInt = $db->prepare("
+            SELECT session_id, student_id, points_awarded 
+            FROM interaction_logs 
+            WHERE session_id IN ($inClause)
+        ");
+        $stmtInt->execute($sessionIds);
+        $interactions = $stmtInt->fetchAll(PDO::FETCH_ASSOC);
+        $intData = [];
+        foreach ($interactions as $i) {
+            $intData[$i['session_id']][$i['student_id']][] = (int)$i['points_awarded'];
+        }
+
+        // 7. Tính CPI tích lũy qua từng buổi học cho từng học sinh
+        $studAccum = [];
+        foreach ($studentIds as $sid) {
+            $studAccum[$sid] = [
+                'passed_sessions' => 0,
+                'att_points' => 0,
+                'quiz_score_sum' => 0,
+                'quiz_max_sum' => 0,
+                'int_points' => 0
+            ];
+        }
+
+        $sessionTrends = [];
+        foreach ($sessions as $sess) {
+            $sessId = $sess['id'];
+            $sessDate = $sess['session_date'];
+            
+            $cpiSum = 0;
+            $cpiCount = 0;
+
+            foreach ($studentIds as $sid) {
+                $accum = &$studAccum[$sid];
+                $accum['passed_sessions']++;
+
+                // Điểm danh
+                $status = $attRecords[$sessId][$sid] ?? 'absent';
+                $pts = $aPts;
+                if ($status === 'present') $pts = $pPts;
+                elseif ($status === 'late') $pts = $lPts;
+                $accum['att_points'] += $pts;
+
+                // Quiz
+                if (isset($quizData[$sessId][$sid])) {
+                    foreach ($quizData[$sessId][$sid] as $q) {
+                        $accum['quiz_score_sum'] += $q['score'];
+                        $accum['quiz_max_sum'] += $q['total_marks'];
+                    }
+                }
+
+                // Tương tác
+                if (isset($intData[$sessId][$sid])) {
+                    foreach ($intData[$sessId][$sid] as $ptsAwarded) {
+                        $accum['int_points'] += $ptsAwarded;
+                    }
+                }
+
+                // Tính CPI
+                $maxAttPoints = $accum['passed_sessions'] * $pPts;
+                $normalizedAttScore = ($maxAttPoints > 0) ? ($accum['att_points'] / $maxAttPoints) * 100 : 100;
+
+                $normalizedQuizScore = 100;
+                if ($accum['quiz_max_sum'] > 0) {
+                    $normalizedQuizScore = ($accum['quiz_score_sum'] / $accum['quiz_max_sum']) * 100;
+                }
+
+                $bonusPoints = $accum['int_points'] * $iPtsRule * 2;
+                if ($bonusPoints > 10) $bonusPoints = 10;
+
+                $cpi = ($normalizedAttScore * ($attWeight / 100)) + ($normalizedQuizScore * ($quizWeight / 100)) + $bonusPoints;
+                if ($cpi > 100) $cpi = 100;
+                if ($cpi < 0) $cpi = 0;
+
+                $cpiSum += $cpi;
+                $cpiCount++;
+            }
+
+            $avgCpiVal = $cpiCount > 0 ? round($cpiSum / $cpiCount, 1) : 0.0;
+            $sessionTrends[] = [
+                'session_id' => $sessId,
+                'date' => $sessDate,
+                'avg_cpi' => $avgCpiVal
+            ];
+        }
+
+        return $sessionTrends;
     }
 }

@@ -1,6 +1,6 @@
 <?php
 // core/Model.php
-require_once '../config/database.php';
+require_once __DIR__ . '/../config/database.php';
 
 abstract class Model {
     public $db;

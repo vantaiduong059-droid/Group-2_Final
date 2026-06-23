@@ -2,19 +2,33 @@
 CREATE DATABASE IF NOT EXISTS attendance_system CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE attendance_system;
 
--- 1. Bảng users
+-- 1. Bảng majors (Ngành học)
+CREATE TABLE `majors` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `code` VARCHAR(20) NOT NULL UNIQUE,
+  `name` VARCHAR(100) NOT NULL
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 2. Bảng users
 CREATE TABLE `users` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `username` VARCHAR(50) NOT NULL UNIQUE,
   `password` VARCHAR(255) NOT NULL,
-  `full_name` VARCHAR(100) NOT NULL,
+  `first_name` VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_vietnamese_ci NOT NULL,
+  `last_name` VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_vietnamese_ci NOT NULL,
+  `full_name` VARCHAR(151) GENERATED ALWAYS AS (CONCAT(last_name, ' ', first_name)) STORED,
   `email` VARCHAR(100) NOT NULL UNIQUE,
   `role` ENUM('admin', 'teacher', 'student') NOT NULL DEFAULT 'student',
+  `cohort` VARCHAR(20) DEFAULT NULL,
+  `major_id` INT DEFAULT NULL,
+  `phone` VARCHAR(20) DEFAULT NULL,
+  `avatar_url` VARCHAR(500) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`major_id`) REFERENCES `majors`(`id`) ON DELETE SET NULL
 );
 
--- 2. Bảng courses (Khóa học/Học phần)
+-- 3. Bảng courses (Khóa học/Học phần)
 CREATE TABLE `courses` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
   `code` VARCHAR(20) NOT NULL UNIQUE,
@@ -22,6 +36,7 @@ CREATE TABLE `courses` (
   `name` VARCHAR(200) NOT NULL,
   `credits` INT DEFAULT 3,
   `periods` INT DEFAULT 45,
+  `total_sessions` INT DEFAULT 15,
   `description` TEXT,
   `teacher_id` INT,
   `rule_present_points` INT DEFAULT 2,
@@ -34,6 +49,17 @@ CREATE TABLE `courses` (
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`teacher_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 );
+
+-- Bảng phụ: course_schedules (Lịch học cố định trong tuần)
+CREATE TABLE `course_schedules` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `course_id` INT NOT NULL,
+  `day_of_week` INT NOT NULL,
+  `start_time` TIME NOT NULL,
+  `end_time` TIME NOT NULL,
+  `room` VARCHAR(100) NOT NULL,
+  FOREIGN KEY (`course_id`) REFERENCES `courses`(`id`) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Bảng phụ: course_students (N-N giữa courses và users có role student)
 CREATE TABLE `course_students` (
@@ -145,7 +171,50 @@ CREATE TABLE `alerts` (
   FOREIGN KEY (`course_id`) REFERENCES `courses`(`id`) ON DELETE CASCADE
 );
 
--- Dữ liệu Mẫu (Dummy Data) được sinh tự động
+-- 11. Bảng notifications (Thông báo hệ thống)
+CREATE TABLE `notifications` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `message` TEXT NOT NULL,
+  `link` VARCHAR(255) DEFAULT NULL,
+  `is_read` BOOLEAN DEFAULT FALSE,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+);
+
+-- 12. Bảng attendance_change_logs (Log thay đổi điểm danh)
+CREATE TABLE IF NOT EXISTS `attendance_change_logs` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `session_id` INT NOT NULL,
+  `student_id` INT NOT NULL,
+  `changed_by` INT NOT NULL,
+  `old_status` ENUM('present','absent','late','excused') DEFAULT NULL,
+  `new_status` ENUM('present','absent','late','excused') NOT NULL,
+  `reason` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`session_id`) REFERENCES `class_sessions`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`student_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`changed_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- 13. Bảng student_complaints (Khiếu nại điểm danh của sinh viên)
+CREATE TABLE IF NOT EXISTS `student_complaints` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `session_id` INT NOT NULL,
+  `student_id` INT NOT NULL,
+  `description` TEXT NOT NULL,
+  `status` ENUM('pending','resolved','rejected') DEFAULT 'pending',
+  `resolved_by` INT DEFAULT NULL,
+  `resolve_note` TEXT DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `resolved_at` TIMESTAMP NULL DEFAULT NULL,
+  FOREIGN KEY (`session_id`) REFERENCES `class_sessions`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`student_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`resolved_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+
 
 -- 1. Bảng users
 INSERT INTO `users` (`id`, `username`, `password`, `full_name`, `email`, `role`) VALUES (1, 'admin', '$2y$10$ZhgfamOnzCIf/dLEHyOrzOQ7QpSM/vosBqfIPMsX7ANmbvEppc8nW', 'System Admin', 'admin@example.com', 'admin') ON DUPLICATE KEY UPDATE id=id;
@@ -885,33 +954,74 @@ INSERT INTO `engagement_scores` (`course_id`, `student_id`, `attendance_points`,
 INSERT INTO `engagement_scores` (`course_id`, `student_id`, `attendance_points`, `interaction_points`, `total_score`) VALUES (32, 335, 0, 0, 100) ON DUPLICATE KEY UPDATE course_id=course_id;
 INSERT INTO `engagement_scores` (`course_id`, `student_id`, `attendance_points`, `interaction_points`, `total_score`) VALUES (32, 339, 0, 0, 100) ON DUPLICATE KEY UPDATE course_id=course_id;
 
--- --------------------------------------------------------
--- Table structure for table `leave_requests`
--- --------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `leave_requests` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `student_id` INT NOT NULL,
-  `session_id` INT NOT NULL,
-  `reason` TEXT NOT NULL,
-  `teacher_note` TEXT DEFAULT NULL,
-  `status` ENUM('pending','approved','rejected') DEFAULT 'pending',
-  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+-- =========================================================================
+-- Phase 3 Nâng cấp hệ thống: Cấu hình mặc định, Câu hỏi Quiz, Thảo luận lớp học, và Nâng cấp Cảnh báo
+-- =========================================================================
 
--- --------------------------------------------------------
--- Table structure for table `notifications`
--- --------------------------------------------------------
-CREATE TABLE IF NOT EXISTS `notifications` (
+-- 1. Bảng system_configs (Cấu hình mặc định hệ thống)
+CREATE TABLE IF NOT EXISTS `system_configs` (
+  `config_key` VARCHAR(100) PRIMARY KEY,
+  `config_value` VARCHAR(255) NOT NULL,
+  `description` VARCHAR(255) DEFAULT NULL,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+INSERT INTO `system_configs` (`config_key`, `config_value`, `description`) VALUES
+('default_absent_limit', '3', 'Giới hạn số buổi vắng tối đa trước khi cảnh báo'),
+('default_low_cpi_threshold', '50', 'Ngưỡng điểm CPI thấp tối đa trước khi cảnh báo'),
+('default_rule_present_points', '2', 'Điểm cộng mặc định khi đi học đầy đủ'),
+('default_rule_late_points', '1', 'Điểm cộng mặc định khi đi muộn'),
+('default_rule_absent_points', '0', 'Điểm khi vắng mặt'),
+('default_rule_interaction_points', '1', 'Hệ số điểm phát biểu tương tác mặc định'),
+('default_rule_attendance_weight', '50', 'Trọng số điểm chuyên cần mặc định (%)'),
+('default_rule_quiz_weight', '50', 'Trọng số điểm Quiz mặc định (%)')
+ON DUPLICATE KEY UPDATE config_key=config_key;
+
+-- 2. Bảng quiz_questions (Câu hỏi trắc nghiệm của Quiz)
+CREATE TABLE IF NOT EXISTS `quiz_questions` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id` INT NOT NULL,
+  `quiz_id` INT NOT NULL,
+  `question_text` TEXT NOT NULL,
+  `option_a` VARCHAR(255) NOT NULL,
+  `option_b` VARCHAR(255) NOT NULL,
+  `option_c` VARCHAR(255) NOT NULL,
+  `option_d` VARCHAR(255) NOT NULL,
+  `correct_option` ENUM('A', 'B', 'C', 'D') NOT NULL,
+  FOREIGN KEY (`quiz_id`) REFERENCES `quiz_sessions`(`id`) ON DELETE CASCADE
+);
+
+-- 3. Bảng class_discussions (Chủ đề thảo luận lớp học phần)
+CREATE TABLE IF NOT EXISTS `class_discussions` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `session_id` INT DEFAULT NULL,
+  `course_id` INT NOT NULL,
   `title` VARCHAR(255) NOT NULL,
-  `message` TEXT NOT NULL,
-  `link` VARCHAR(255) DEFAULT NULL,
-  `is_read` TINYINT(1) DEFAULT 0,
+  `content` TEXT NOT NULL,
+  `created_by` INT NOT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+  FOREIGN KEY (`session_id`) REFERENCES `class_sessions`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`course_id`) REFERENCES `courses`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON DELETE CASCADE
+);
+
+-- 4. Bảng discussion_replies (Phản hồi thảo luận lớp học)
+CREATE TABLE IF NOT EXISTS `discussion_replies` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `discussion_id` INT NOT NULL,
+  `user_id` INT NOT NULL,
+  `content` TEXT NOT NULL,
+  `score` DECIMAL(5,2) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`discussion_id`) REFERENCES `class_discussions`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+);
+
+-- 5. Cập nhật các cột mới cho bảng courses và alerts
+ALTER TABLE `courses` ADD COLUMN `rule_absent_limit` INT DEFAULT NULL;
+ALTER TABLE `courses` ADD COLUMN `rule_low_cpi_threshold` INT DEFAULT NULL;
+
+ALTER TABLE `alerts` ADD COLUMN `status` ENUM('pending', 'resolved') DEFAULT 'pending';
+ALTER TABLE `alerts` ADD COLUMN `notes` TEXT DEFAULT NULL;
+ALTER TABLE `alerts` ADD COLUMN `advisor_id` INT DEFAULT NULL;
+ALTER TABLE `alerts` ADD CONSTRAINT `fk_alerts_advisor` FOREIGN KEY (`advisor_id`) REFERENCES `users`(`id`) ON DELETE SET NULL;
 

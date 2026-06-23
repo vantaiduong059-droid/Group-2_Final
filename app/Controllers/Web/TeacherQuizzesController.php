@@ -14,7 +14,7 @@ class TeacherQuizzesController extends Controller {
     private $sessionRepo;
 
     public function __construct() {
-        if (!isset($_SESSION['user']) || $_SESSION['user']['role'] !== 'teacher') {
+        if (!isset($_SESSION['user'])) {
             if ($this->isAjaxRequest()) {
                 $this->jsonResponse(['status' => 'error', 'message' => 'Unauthorized'], 403);
             } else {
@@ -25,6 +25,13 @@ class TeacherQuizzesController extends Controller {
         $this->quizRepo = new QuizRepository(new Quiz());
         $this->courseRepo = new CourseRepository(new Course());
         $this->sessionRepo = new SessionRepository(new ClassSession());
+    }
+
+    private function checkTeacherRole() {
+        if ($_SESSION['user']['role'] !== 'teacher') {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Quyền truy cập bị từ chối.'], 403);
+            exit;
+        }
     }
 
     private function isAjaxRequest() {
@@ -96,6 +103,7 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function index() {
+        $this->checkTeacherRole();
         $teacherId = $_SESSION['user']['id'];
         $myCourses = $this->courseRepo->getCoursesByTeacher($teacherId);
 
@@ -110,18 +118,39 @@ class TeacherQuizzesController extends Controller {
     // ==========================================
     
     public function getQuizzes($courseId) {
+        $this->checkTeacherRole();
         $this->checkCourseOwnership($courseId);
         $quizzes = $this->quizRepo->getQuizzesByCourse($courseId);
         $this->jsonResponse(['status' => 'success', 'data' => $quizzes]);
     }
 
     public function getQuestions($quizId) {
-        $this->checkQuizOwnership($quizId);
+        if ($_SESSION['user']['role'] === 'student') {
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->prepare("
+                SELECT cs.course_id FROM quiz_sessions qs
+                JOIN class_sessions cs ON qs.session_id = cs.id
+                WHERE qs.id = ?
+            ");
+            $stmt->execute([$quizId]);
+            $courseId = $stmt->fetchColumn();
+            if (!$courseId) {
+                $this->jsonResponse(['status' => 'error', 'message' => 'Không tìm thấy Quiz.'], 404);
+            }
+            $stmtCheck = $db->prepare("SELECT 1 FROM course_students WHERE course_id = ? AND student_id = ?");
+            $stmtCheck->execute([$courseId, $_SESSION['user']['id']]);
+            if (!$stmtCheck->fetch()) {
+                $this->jsonResponse(['status' => 'error', 'message' => 'Bạn không có quyền truy cập Quiz này.'], 403);
+            }
+        } else {
+            $this->checkQuizOwnership($quizId);
+        }
         $questions = $this->quizRepo->getQuestionsByQuiz($quizId);
         $this->jsonResponse(['status' => 'success', 'data' => $questions]);
     }
 
     public function createQuiz($courseId) {
+        $this->checkTeacherRole();
         $this->checkCourseOwnership($courseId);
         $data = $this->getJsonInput();
         
@@ -140,6 +169,7 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function updateQuiz($quizId) {
+        $this->checkTeacherRole();
         $this->checkQuizOwnership($quizId);
         $data = $this->getJsonInput();
         
@@ -156,6 +186,7 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function deleteQuiz($quizId) {
+        $this->checkTeacherRole();
         $this->checkQuizOwnership($quizId);
         $res = $this->quizRepo->deleteQuiz($quizId);
         if ($res) {
@@ -170,6 +201,7 @@ class TeacherQuizzesController extends Controller {
     // ==========================================
 
     public function addQuestion($quizId) {
+        $this->checkTeacherRole();
         $this->checkQuizOwnership($quizId);
         $data = $this->getJsonInput();
         $data['quiz_id'] = $quizId;
@@ -189,6 +221,7 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function updateQuestion($questionId) {
+        $this->checkTeacherRole();
         $this->checkQuestionOwnership($questionId);
         $data = $this->getJsonInput();
 
@@ -205,6 +238,7 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function deleteQuestion($questionId) {
+        $this->checkTeacherRole();
         $this->checkQuestionOwnership($questionId);
         $res = $this->quizRepo->deleteQuestion($questionId);
         if ($res) {
@@ -219,6 +253,7 @@ class TeacherQuizzesController extends Controller {
     // ==========================================
 
     public function getDiscussions($courseId) {
+        $this->checkTeacherRole();
         $this->checkCourseOwnership($courseId);
         $discussions = $this->quizRepo->getDiscussionsByCourse($courseId);
         
@@ -247,6 +282,7 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function createDiscussion($courseId) {
+        $this->checkTeacherRole();
         $this->checkCourseOwnership($courseId);
         $data = $this->getJsonInput();
         $data['course_id'] = $courseId;
@@ -265,6 +301,7 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function deleteDiscussion($discussionId) {
+        $this->checkTeacherRole();
         $this->checkDiscussionOwnership($discussionId);
         $res = $this->quizRepo->deleteDiscussion($discussionId);
         if ($res) {
@@ -275,12 +312,28 @@ class TeacherQuizzesController extends Controller {
     }
 
     public function getReplies($discussionId) {
-        $this->checkDiscussionOwnership($discussionId);
+        if ($_SESSION['user']['role'] === 'student') {
+            $db = Database::getInstance()->getConnection();
+            $stmt = $db->prepare("SELECT course_id FROM class_discussions WHERE id = ?");
+            $stmt->execute([$discussionId]);
+            $courseId = $stmt->fetchColumn();
+            if (!$courseId) {
+                $this->jsonResponse(['status' => 'error', 'message' => 'Không tìm thấy thảo luận.'], 404);
+            }
+            $stmtCheck = $db->prepare("SELECT 1 FROM course_students WHERE course_id = ? AND student_id = ?");
+            $stmtCheck->execute([$courseId, $_SESSION['user']['id']]);
+            if (!$stmtCheck->fetch()) {
+                $this->jsonResponse(['status' => 'error', 'message' => 'Bạn không có quyền truy cập thảo luận này.'], 403);
+            }
+        } else {
+            $this->checkDiscussionOwnership($discussionId);
+        }
         $replies = $this->quizRepo->getRepliesByDiscussion($discussionId);
         $this->jsonResponse(['status' => 'success', 'data' => $replies]);
     }
 
     public function createReply($discussionId) {
+        $this->checkTeacherRole();
         $this->checkDiscussionOwnership($discussionId);
         $data = $this->getJsonInput();
         $data['discussion_id'] = $discussionId;
@@ -303,6 +356,7 @@ class TeacherQuizzesController extends Controller {
      * Lấy tất cả quiz và thảo luận của một buổi học cụ thể
      */
     public function getBySession($sessionId) {
+        $this->checkTeacherRole();
         $db = Database::getInstance()->getConnection();
 
         // Tìm course_id từ session để đếm tổng số sinh viên
@@ -350,6 +404,7 @@ class TeacherQuizzesController extends Controller {
      * POST /api/teacher/quizzes - Tạo quiz + câu hỏi trong 1 request
      */
     public function createQuizWithQuestions() {
+        $this->checkTeacherRole();
         $teacherId = $_SESSION['user']['id'];
         $data = $this->getJsonInput();
 
@@ -397,6 +452,7 @@ class TeacherQuizzesController extends Controller {
      * POST /api/teacher/discussions - Tạo thảo luận cho buổi học cụ thể
      */
     public function createDiscussionInSession() {
+        $this->checkTeacherRole();
         $teacherId = $_SESSION['user']['id'];
         $data = $this->getJsonInput();
 
@@ -452,12 +508,88 @@ class TeacherQuizzesController extends Controller {
             $stmtD = $db->prepare("SELECT cd.session_id, cs.course_id FROM class_discussions cd JOIN class_sessions cs ON cd.session_id = cs.id WHERE cd.id = ?");
             $stmtD->execute([$discussionId]);
             $row = $stmtD->fetch();
-            if ($row) {
-                $stmtLog = $db->prepare("INSERT INTO interaction_logs (student_id, session_id, course_id, type, points, created_at) VALUES (:sid, :sesid, :cid, 'discussion', 2, NOW())");
-                $stmtLog->execute(['sid' => $userId, 'sesid' => $row['session_id'], 'cid' => $row['course_id']]);
+            if ($row && $row['session_id']) {
+                $stmtLog = $db->prepare("INSERT INTO interaction_logs (student_id, session_id, type, points_awarded, created_at) VALUES (:sid, :sesid, 'discussion', 2, NOW())");
+                $stmtLog->execute(['sid' => $userId, 'sesid' => $row['session_id']]);
+
+                // Tính toán lại điểm chuyên cần CPI cho sinh viên
+                require_once '../app/Repositories/EngagementRepository.php';
+                require_once '../app/Models/Engagement.php';
+                $engagementRepo = new EngagementRepository(new Engagement());
+                $engagementRepo->recalculateScore($row['course_id'], $userId);
             }
         }
 
         $this->jsonResponse(['status' => 'success', 'message' => 'Đã đăng bình luận thành công!']);
+    }
+
+    /**
+     * GET /api/teacher/discussions/{discussionId}/submissions
+     * Lấy danh sách các bài trả lời thảo luận của sinh viên để giảng viên chấm điểm
+     */
+    public function getDiscussionSubmissions($discussionId) {
+        $this->checkTeacherRole();
+        $this->checkDiscussionOwnership($discussionId);
+
+        $db = Database::getInstance()->getConnection();
+        $stmt = $db->prepare("
+            SELECT dr.id as reply_id, dr.content, dr.created_at, dr.score,
+                   u.id as student_id, u.full_name as student_name, u.username as student_code, u.email as student_email
+            FROM discussion_replies dr
+            JOIN users u ON dr.user_id = u.id
+            WHERE dr.discussion_id = ? AND u.role = 'student'
+            ORDER BY dr.created_at DESC
+        ");
+        $stmt->execute([$discussionId]);
+        $submissions = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $this->jsonResponse(['status' => 'success', 'data' => $submissions]);
+    }
+
+    /**
+     * POST /api/teacher/discussions/replies/{replyId}/grade
+     * Giáo viên chấm điểm cho một bình luận thảo luận của sinh viên
+     */
+    public function gradeReply($replyId) {
+        $this->checkTeacherRole();
+        $db = Database::getInstance()->getConnection();
+
+        // Lấy thông tin reply
+        $stmtReply = $db->prepare("SELECT discussion_id, user_id FROM discussion_replies WHERE id = ?");
+        $stmtReply->execute([$replyId]);
+        $reply = $stmtReply->fetch();
+        if (!$reply) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Không tìm thấy phản hồi.'], 404);
+        }
+
+        // Kiểm tra quyền sở hữu thảo luận của GV
+        $this->checkDiscussionOwnership($reply['discussion_id']);
+
+        $data = $this->getJsonInput();
+        $score = isset($data['score']) ? floatval($data['score']) : null;
+        if ($score !== null && ($score < 0 || $score > 10)) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Điểm số phải từ 0 đến 10.'], 400);
+        }
+
+        $stmt = $db->prepare("UPDATE discussion_replies SET score = ? WHERE id = ?");
+        $res = $stmt->execute([$score, $replyId]);
+
+        if ($res) {
+            // Cập nhật lại điểm tương tác CPI cho sinh viên đó
+            $stmtDisc = $db->prepare("SELECT course_id FROM class_discussions WHERE id = ?");
+            $stmtDisc->execute([$reply['discussion_id']]);
+            $courseId = $stmtDisc->fetchColumn();
+
+            if ($courseId) {
+                require_once '../app/Repositories/EngagementRepository.php';
+                require_once '../app/Models/Engagement.php';
+                $engagementRepo = new EngagementRepository(new Engagement());
+                $engagementRepo->recalculateScore($courseId, $reply['user_id']);
+            }
+
+            $this->jsonResponse(['status' => 'success', 'message' => 'Chấm điểm thảo luận thành công!']);
+        } else {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Không thể lưu điểm.'], 500);
+        }
     }
 }

@@ -147,7 +147,7 @@ class EngagementRepository extends BaseRepository {
                 interaction_points = :int_points_up,
                 total_score = :total_score_up
         ");
-        return $stmtUpdate->execute([
+        $res = $stmtUpdate->execute([
             'course_id' => $courseId,
             'student_id' => $studentId,
             'attendance_points' => $actualAttPoints,
@@ -157,6 +157,14 @@ class EngagementRepository extends BaseRepository {
             'int_points_up' => $interactionPoints,
             'total_score_up' => $totalScore
         ]);
+
+        if ($res) {
+            require_once __DIR__ . '/../Helpers/AttendanceStatsHelper.php';
+            require_once __DIR__ . '/../Helpers/AlertEngine.php';
+            AlertEngine::checkStudent($studentId, $courseId, true);
+        }
+
+        return $res;
     }
 
     /**
