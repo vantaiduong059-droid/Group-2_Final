@@ -148,7 +148,7 @@
                         <div class="card shadow-lg border-0 d-none" id="notifDropdown" style="position:absolute;right:0;top:48px;width:320px;z-index:9999;border-radius:12px;max-height:400px;overflow-y:auto;">
                             <div class="card-header d-flex justify-content-between align-items-center py-2 px-3" style="background:var(--bg-card,#fff);border-bottom:1px solid var(--border-color,#e5e7eb);">
                                 <span class="fw-bold small">Thông báo</span>
-                                <button class="btn btn-link btn-sm text-muted p-0" id="btnMarkAllRead">Dầ đọc tất cả</button>
+                                <button class="btn btn-link btn-sm text-muted p-0" id="btnMarkAllRead">Đã đọc tất cả</button>
                             </div>
                             <div id="notifList" class="py-1"></div>
                         </div>
