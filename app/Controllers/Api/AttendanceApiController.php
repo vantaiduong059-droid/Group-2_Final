@@ -211,59 +211,63 @@ class AttendanceApiController extends Controller {
             $this->jsonResponse(['status' => 'error', 'message' => 'Thiếu ID buổi học.'], 400);
         }
 
-        // Kiểm tra xem sinh viên có thuộc lớp này không
-        $db = Database::getInstance()->getConnection();
-        $stmtCheckEnroll = $db->prepare("
-            SELECT cs.course_id 
-            FROM class_sessions cs
-            JOIN course_students cstud ON cs.course_id = cstud.course_id
-            WHERE cs.id = ? AND cstud.student_id = ?
-        ");
-        $stmtCheckEnroll->execute([$sessionId, $studentId]);
-        $courseId = $stmtCheckEnroll->fetchColumn();
+        try {
+            // Kiểm tra xem sinh viên có thuộc lớp này không
+            $db = Database::getInstance()->getConnection();
+            $stmtCheckEnroll = $db->prepare("
+                SELECT cs.course_id 
+                FROM class_sessions cs
+                JOIN course_students cstud ON cs.course_id = cstud.course_id
+                WHERE cs.id = ? AND cstud.student_id = ?
+            ");
+            $stmtCheckEnroll->execute([$sessionId, $studentId]);
+            $courseId = $stmtCheckEnroll->fetchColumn();
 
-        if (!$courseId) {
-            $this->jsonResponse(['status' => 'error', 'message' => 'Bạn không đăng ký học phần này.'], 403);
-        }
+            if (!$courseId) {
+                $this->jsonResponse(['status' => 'error', 'message' => 'Bạn không đăng ký học phần này.'], 403);
+            }
 
-        // Xác định hình thức và Strategy tương ứng
-        $stmtSession = $db->prepare("SELECT qr_token, attendance_code FROM class_sessions WHERE id = ?");
-        $stmtSession->execute([$sessionId]);
-        $sessInfo = $stmtSession->fetch();
-        
-        $strategy = null;
-        if (isset($data['qr_token']) && !empty($data['qr_token'])) {
-            $strategy = new QrAttendanceStrategy();
-        } else if (isset($data['code']) && !empty($data['code'])) {
-            $strategy = new CodeAttendanceStrategy();
-        } else {
-            $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng cung cấp mã Code hoặc QR token để điểm danh.'], 400);
-        }
-
-        $result = $strategy->validateAndRecord($sessionId, $studentId, $data);
-
-        if ($result['success']) {
-            // Lưu bản ghi điểm danh
-            $this->attendanceRepo->saveRecord($sessionId, $studentId, $result['method_id'], $result['status']);
+            // Xác định hình thức và Strategy tương ứng
+            $stmtSession = $db->prepare("SELECT qr_token, attendance_code FROM class_sessions WHERE id = ?");
+            $stmtSession->execute([$sessionId]);
+            $sessInfo = $stmtSession->fetch();
             
-            // Kích hoạt Observer để kiểm tra cảnh báo
-            $subject = new AttendanceSubject();
-            $subject->attach(new AlertObserver());
-            $subject->recordAttendance($sessionId, $studentId, $result['status']);
+            $strategy = null;
+            if (isset($data['qr_token']) && !empty($data['qr_token'])) {
+                $strategy = new QrAttendanceStrategy();
+            } else if (isset($data['code']) && !empty($data['code'])) {
+                $strategy = new CodeAttendanceStrategy();
+            } else {
+                $this->jsonResponse(['status' => 'error', 'message' => 'Vui lòng cung cấp mã Code hoặc QR token để điểm danh.'], 400);
+            }
 
-            // Tính toán lại CPI
-            $this->engagementRepo->recalculateScore($courseId, $studentId);
+            $result = $strategy->validateAndRecord($sessionId, $studentId, $data);
 
-            $this->jsonResponse([
-                'status' => 'success', 
-                'message' => $result['message'],
-                'data' => [
-                    'status' => $result['status'],
-                    'recorded_at' => date('Y-m-d H:i:s')
-                ]
-            ]);
-        } else {
-            $this->jsonResponse(['status' => 'error', 'message' => $result['message']], 400);
+            if ($result['success']) {
+                // Lưu bản ghi điểm danh
+                $this->attendanceRepo->saveRecord($sessionId, $studentId, $result['method_id'], $result['status']);
+                
+                // Kích hoạt Observer để kiểm tra cảnh báo
+                $subject = new AttendanceSubject();
+                $subject->attach(new AlertObserver());
+                $subject->recordAttendance($sessionId, $studentId, $result['status']);
+
+                // Tính toán lại CPI
+                $this->engagementRepo->recalculateScore($courseId, $studentId);
+
+                $this->jsonResponse([
+                    'status' => 'success', 
+                    'message' => $result['message'],
+                    'data' => [
+                        'status' => $result['status'],
+                        'recorded_at' => date('Y-m-d H:i:s')
+                    ]
+                ]);
+            } else {
+                $this->jsonResponse(['status' => 'error', 'message' => $result['message']], 400);
+            }
+        } catch (Exception $e) {
+            $this->jsonResponse(['status' => 'error', 'message' => 'Lỗi hệ thống khi điểm danh: ' . $e->getMessage()], 500);
         }
     }
 }
