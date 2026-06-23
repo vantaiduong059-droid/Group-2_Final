@@ -884,3 +884,34 @@ INSERT INTO `engagement_scores` (`course_id`, `student_id`, `attendance_points`,
 INSERT INTO `engagement_scores` (`course_id`, `student_id`, `attendance_points`, `interaction_points`, `total_score`) VALUES (32, 328, 0, 0, 100) ON DUPLICATE KEY UPDATE course_id=course_id;
 INSERT INTO `engagement_scores` (`course_id`, `student_id`, `attendance_points`, `interaction_points`, `total_score`) VALUES (32, 335, 0, 0, 100) ON DUPLICATE KEY UPDATE course_id=course_id;
 INSERT INTO `engagement_scores` (`course_id`, `student_id`, `attendance_points`, `interaction_points`, `total_score`) VALUES (32, 339, 0, 0, 100) ON DUPLICATE KEY UPDATE course_id=course_id;
+
+-- --------------------------------------------------------
+-- Table structure for table `leave_requests`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `leave_requests` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `student_id` INT NOT NULL,
+  `session_id` INT NOT NULL,
+  `reason` TEXT NOT NULL,
+  `teacher_note` TEXT DEFAULT NULL,
+  `status` ENUM('pending','approved','rejected') DEFAULT 'pending',
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`session_id`) REFERENCES `class_sessions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+-- Table structure for table `notifications`
+-- --------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `notifications` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id` INT NOT NULL,
+  `title` VARCHAR(255) NOT NULL,
+  `message` TEXT NOT NULL,
+  `link` VARCHAR(255) DEFAULT NULL,
+  `is_read` TINYINT(1) DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
