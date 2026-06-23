@@ -234,6 +234,12 @@ class LeaveRequestApiController extends Controller {
                 }
             }
 
+            // Tính toán lại CPI của sinh viên sau khi duyệt/từ chối phép
+            require_once '../app/Models/Engagement.php';
+            require_once '../app/Repositories/EngagementRepository.php';
+            $engagementRepo = new EngagementRepository(new Engagement());
+            $engagementRepo->recalculateScore($leaveReq['course_id'], $leaveReq['student_id']);
+
             $this->jsonResponse(['status' => 'success', 'message' => $msg]);
         } catch (Exception $e) {
             $this->jsonResponse(['status' => 'error', 'message' => 'Lỗi xử lý đơn: ' . $e->getMessage()], 500);
