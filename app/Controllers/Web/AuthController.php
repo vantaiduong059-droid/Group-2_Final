@@ -39,13 +39,6 @@ class AuthController extends Controller {
             }
             exit;
         } else {
-            // Hardcode bypass cho mục đích test bài thi nếu ko connect đc DB hoặc quên hash
-            if ($username === 'admin' && $password === 'admin' && $selectedRole === 'admin') {
-                $_SESSION['user'] = ['id'=>1, 'role'=>'admin', 'full_name'=>'Admin Test'];
-                header('Location: ' . BASE_URL . '/admin/dashboard');
-                exit;
-            }
-            
             $this->view('auth/login', ['error' => 'Tên đăng nhập hoặc mật khẩu không chính xác.']);
         }
     }
