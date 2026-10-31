@@ -76,5 +76,5 @@ Ke_hoach_He_thong_Diem_danh_Sinh_vien.pdf   Kế hoạch xây dựng hệ thốn
 
 ## Đóng góp
 
-- **Tài Dương Văn:** thiết kế và xây dựng toàn bộ giao diện, logic điểm danh và cảnh báo điểm danh, cơ sở dữ liệu.
+- **Dương Văn Tài:** thiết kế và xây dựng toàn bộ giao diện, logic điểm danh và cảnh báo điểm danh, cơ sở dữ liệu.
 - **Hà Đức Mạnh, Dương Trung Nguyên:** chia và đăng tải phần giảng viên và sinh viên lên repo.
