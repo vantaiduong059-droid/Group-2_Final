@@ -67,7 +67,12 @@ Ke_hoach_He_thong_Diem_danh_Sinh_vien.pdf   Kế hoạch xây dựng hệ thốn
 
 ## Ảnh chụp màn hình
 
-[Thêm 3-4 ảnh: trang giảng viên mở điểm danh, trang sinh viên điểm danh, trang cảnh báo, dashboard]
+<img width="1919" height="1140" alt="Ảnh chụp màn hình 2026-10-31 153739" src="https://github.com/user-attachments/assets/a1ec73c9-fca5-4acb-8fec-010da11efca8" />
+
+<img width="1918" height="1031" alt="Ảnh chụp màn hình 2026-10-31 153802" src="https://github.com/user-attachments/assets/979b88b5-1f5c-43d4-b166-cb4fa4a46261" />
+
+<img width="1900" height="1029" alt="image" src="https://github.com/user-attachments/assets/cca64e76-c4d6-4acf-b3d5-f57a020c6c02" />
+
 
 ## Đóng góp
 
